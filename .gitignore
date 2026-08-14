@@ -1,0 +1,37 @@
+# Node / npm
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.*
+!.env.example
+
+# Flutter / Dart
+.dart_tool/
+.pub/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/.symlinks/
+*.iml
+
+# 本地数据（开发运行产生的数据库、上传照片等）
+*.db
+*.db-journal
+*.sqlite
+data/
+uploads/
+tmp/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
