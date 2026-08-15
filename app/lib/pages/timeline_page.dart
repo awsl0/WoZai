@@ -3,10 +3,9 @@ import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
 import '../utils/calendar.dart';
-import '../widgets/event_card.dart';
 import 'event_page.dart';
 
-/// 时间线：事件按时间排序 + 节日/纪念日标记
+/// 时间线：按年/月归档统计，紧凑条目（日期 + 缩略图 + 标题），点击进详情
 class TimelinePage extends StatefulWidget {
   const TimelinePage({super.key});
 
@@ -54,109 +53,34 @@ class _TimelinePageState extends State<TimelinePage> {
     return s?.toLocal();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    final together = togetherText(Session.instance.space);
+  /// 按 年 → 月 分组（时间倒序）
+  List<MapEntry<int, List<MapEntry<int, List<Map<String, dynamic>>>>>> get _grouped {
+    final years = <int, Map<int, List<Map<String, dynamic>>>>{};
+    for (final e in _events) {
+      final d = DateTime.tryParse((e['happenedAt'] as String?) ?? '')?.toLocal();
+      if (d == null) continue;
+      years.putIfAbsent(d.year, () => {});
+      years[d.year]!.putIfAbsent(d.month, () => []).add(e);
+    }
+    final yearList = years.entries.toList()..sort((a, b) => b.key.compareTo(a.key));
+    return yearList.map((y) {
+      final months = y.value.entries.toList()..sort((a, b) => b.key.compareTo(a.key));
+      return MapEntry(y.key, months);
+    }).toList();
+  }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('时间线'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh, tooltip: '刷新'),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            if (together != null)
-              SliverToBoxAdapter(
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [primary, primary.withValues(alpha: 0.7)]),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(together,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-              ),
-            if (_loading && _events.isEmpty)
-              const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
-            else if (_error != null && _events.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_error!),
-                      const SizedBox(height: 8),
-                      FilledButton(onPressed: _refresh, child: const Text('重试')),
-                    ],
-                  ),
-                ),
-              )
-            else if (_events.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.photo_camera_outlined, size: 64, color: Colors.grey),
-                      const SizedBox(height: 12),
-                      const Text('还没有记录', style: TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 4),
-                      const Text('点右下角「记录此刻」，拍张照开始吧', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.only(bottom: 88),
-                sliver: SliverList.builder(
-                  itemCount: _events.length,
-                  itemBuilder: (context, i) {
-                    final e = _events[i];
-                    final happened = DateTime.tryParse((e['happenedAt'] as String?) ?? '')?.toLocal();
-                    final month = DateFormat('yyyy年M月').format(happened ?? DateTime.now());
-                    final prevHappened = i < _events.length - 1
-                        ? DateTime.tryParse((_events[i + 1]['happenedAt'] as String?) ?? '')?.toLocal()
-                        : null;
-                    final prevMonth = prevHappened != null ? DateFormat('yyyy年M月').format(prevHappened) : null;
-                    final special = happened != null ? specialDayOf(happened, _startDate) : null;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (month != prevMonth)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                            child: Text(month,
-                                style: TextStyle(fontWeight: FontWeight.bold, color: primary)),
-                          ),
-                        if (special != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
-                            child: _SpecialBadge(label: special, date: happened!),
-                          ),
-                        EventCard(event: e, onTap: () => _openEvent(e)),
-                      ],
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+  /// 条目标题：备注 → 正文首句 → 地点
+  String _titleOf(Map<String, dynamic> e) {
+    final note = e['note'] as String?;
+    if (note != null && note.isNotEmpty) return note;
+    final content = e['content'] as String?;
+    if (content != null && content.isNotEmpty) {
+      final line = content.replaceAll('\n', ' ').trim();
+      return line.length > 40 ? '${line.substring(0, 40)}…' : line;
+    }
+    final loc = e['locationName'] as String?;
+    if (loc != null && loc.isNotEmpty) return loc;
+    return '未命名的一天';
   }
 
   void _openEvent(Map<String, dynamic> event) async {
@@ -165,36 +89,187 @@ class _TimelinePageState extends State<TimelinePage> {
     ));
     if (refreshed == true) _refresh();
   }
-}
-
-/// 节日/纪念日小徽标
-class _SpecialBadge extends StatelessWidget {
-  const _SpecialBadge({required this.label, required this.date});
-
-  final String label;
-  final DateTime date;
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primary.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.celebration_outlined, size: 14, color: primary),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: primary, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 4),
-          Text(DateFormat('M月d日').format(date),
-              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final grouped = _grouped;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('时间线'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh, tooltip: '刷新'),
         ],
+      ),
+      body: _loading && _events.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null && _events.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_error!),
+                      const SizedBox(height: 8),
+                      FilledButton(onPressed: _refresh, child: const Text('重试')),
+                    ],
+                  ),
+                )
+              : grouped.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.photo_camera_outlined, size: 56, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text('还没有记录', style: TextStyle(color: Colors.grey)),
+                          SizedBox(height: 4),
+                          Text('点右下角「记录此刻」，拍张照开始吧', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 88),
+                        children: [
+                          for (final yearEntry in grouped)
+                            _buildYear(theme, primary, yearEntry.key, yearEntry.value),
+                        ],
+                      ),
+                    ),
+    );
+  }
+
+  Widget _buildYear(
+    ThemeData theme,
+    Color primary,
+    int year,
+    List<MapEntry<int, List<Map<String, dynamic>>>> months,
+  ) {
+    final yearCount = months.fold<int>(0, (sum, m) => sum + m.value.length);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 年份标题
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+          child: Row(
+            children: [
+              Text('$year 年',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primary)),
+              const SizedBox(width: 8),
+              Text('$yearCount 条记录',
+                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          height: 1,
+          color: primary.withValues(alpha: 0.2),
+        ),
+        for (final monthEntry in months) _buildMonth(theme, year, monthEntry.key, monthEntry.value),
+      ],
+    );
+  }
+
+  Widget _buildMonth(
+    ThemeData theme,
+    int year,
+    int month,
+    List<Map<String, dynamic>> events,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 月份标题
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 16, 4),
+          child: Row(
+            children: [
+              Text('$month 月', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 6),
+              Text('${events.length} 条',
+                  style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+        for (final e in events) _buildEntry(theme, e),
+      ],
+    );
+  }
+
+  Widget _buildEntry(ThemeData theme, Map<String, dynamic> e) {
+    final happened = DateTime.tryParse((e['happenedAt'] as String?) ?? '')?.toLocal();
+    final photos = (e['photos'] as List?) ?? [];
+    final hasPhoto = photos.isNotEmpty;
+    final special = happened != null ? specialDayOf(happened, _startDate) : null;
+    final title = _titleOf(e);
+    final baseUrl = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final thumbnailPath = hasPhoto ? (photos.first['filePath'] as String? ?? '') : null;
+
+    return InkWell(
+      onTap: () => _openEvent(e),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        child: Row(
+          children: [
+            // 日期
+            SizedBox(
+              width: 44,
+              child: Text(
+                happened != null ? DateFormat('MM-dd').format(happened) : '',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            // 缩略图（有照片时）
+            if (thumbnailPath != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.network(
+                  '$baseUrl/uploads/${thumbnailPath.split('/').last}',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 40,
+                    height: 40,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: const Icon(Icons.image_outlined, size: 18, color: Colors.grey),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
+            // 标题 + 特殊日子标记
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface),
+                    ),
+                  ),
+                  if (special != null) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.celebration_outlined,
+                        size: 14, color: theme.colorScheme.primary),
+                  ],
+                ],
+              ),
+            ),
+            if (!hasPhoto) ...[
+              // 无照片：右侧小图标提示点进去
+              Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade400),
+            ],
+          ],
+        ),
       ),
     );
   }
