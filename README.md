@@ -73,6 +73,14 @@ flutter run -d windows   # 或 -d chrome，无需 Android Studio
 | GET | `/api/space` | 我的空间（含成员） | ✅ |
 | POST | `/api/space/join` | 邀请码加入（上限 2 人） | ✅ |
 | POST | `/api/space/invite` | 重新生成邀请码（仅 owner） | ✅ |
+| POST | `/api/events` | 创建事件（multipart：照片≤9张 + 时间 + 定位 + 备注） | ✅ |
+| GET | `/api/events` | 时间线（倒序，含照片） | ✅ |
+| GET | `/api/events/:id` | 事件详情 | ✅ |
+| PUT | `/api/events/:id` | 编辑事件（改正文/时间/地点，正文改动标记用户编辑） | ✅ |
+| DELETE | `/api/events/:id` | 删除事件（连照片） | ✅ |
+| POST | `/api/events/:id/generate` | AI 看图生成日记（BYOK 多模态） | ✅ |
+| GET | `/api/settings/ai` | 读取 AI 配置（key 脱敏） | ✅ |
+| PUT | `/api/settings/ai` | 保存 AI 配置（空间级共享） | ✅ |
 
 ## 部署（轻量云）
 
@@ -106,7 +114,8 @@ docker compose up -d
 
 - [x] 产品设计（v0.2）
 - [x] M0 后端脚手架：Express + Prisma + SQLite + 注册登录 + 空间/邀请码（含 CI）
-- [ ] M0 Flutter 客户端脚手架（登录页/主页壳，待装 Flutter SDK）
+- [x] M1 后端核心：事件 CRUD + 照片上传 + AI 看图生成日记（BYOK 多模态，链路已验证）
+- [ ] M0/M1 Flutter 客户端（登录页/主页壳，待装 Flutter SDK）
 - [ ] M1：MVP（账号/空间 → 记录 → AI 生成 → 时间线 → 设置 → 导出）
 - [ ] M2：地图视图 / 纪念日 / EXIF / 编辑历史 / 搜索 / 通知
 - [ ] M3：iOS 支持 / 分享卡片 / 年度报告 / 视觉打磨
