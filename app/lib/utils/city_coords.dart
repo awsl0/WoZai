@@ -3,6 +3,8 @@
 /// 注意：浏览器定位返回 WGS-84，在高德瓦片上会有约百米级偏移（MVP 可接受）。
 library;
 
+import 'dart:math' as math;
+
 const List<(String, double, double)> cityCoords = [
   // 直辖市
   ('北京', 39.9042, 116.4074),
@@ -198,4 +200,29 @@ const List<(String, double, double)> cityCoords = [
     if (place.contains(c.$1)) return (c.$1, c.$2, c.$3);
   }
   return null;
+}
+
+/// 球面距离（公里）
+double distanceKm(double lat1, double lng1, double lat2, double lng2) {
+  const r = 6371.0;
+  double rad(double d) => d * math.pi / 180.0;
+  final dLat = rad(lat2 - lat1);
+  final dLng = rad(lng2 - lng1);
+  final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(rad(lat1)) * math.cos(rad(lat2)) * math.sin(dLng / 2) * math.sin(dLng / 2);
+  return 2 * r * math.asin(math.sqrt(a));
+}
+
+/// 坐标 → 最近城市名（用于地图选点后无反向地理编码时的近似地名）
+String nearestCity(double lat, double lng) {
+  String best = '';
+  var bestD = double.infinity;
+  for (final c in cityCoords) {
+    final d = distanceKm(lat, lng, c.$2, c.$3);
+    if (d < bestD) {
+      bestD = d;
+      best = c.$1;
+    }
+  }
+  return bestD < 300 ? best : '未知位置'; // 300km 内才认
 }

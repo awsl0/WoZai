@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../api/api_client.dart';
 import 'event_page.dart';
+import 'place_picker_page.dart';
 
 /// 记录事件页：选照片 + 时间（可回填）+ 地点 + 备注 → 保存
 class RecordPage extends StatefulWidget {
@@ -18,13 +19,12 @@ class _RecordPageState extends State<RecordPage> {
   final List<String> _photoNames = [];
 
   DateTime _happenedAt = DateTime.now();
-  final _locationCtrl = TextEditingController();
+  PlaceResult? _place;
   final _noteCtrl = TextEditingController();
   bool _saving = false;
 
   @override
   void dispose() {
-    _locationCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
   }
@@ -61,12 +61,47 @@ class _RecordPageState extends State<RecordPage> {
     });
   }
 
+  Future<void> _pickPlace() async {
+    final result = await Navigator.of(context).push<PlaceResult>(
+      MaterialPageRoute(builder: (_) => const PlacePickerPage()),
+    );
+    if (result != null) setState(() => _place = result);
+  }
+
+  Future<void> _manualPlace() async {
+    final ctrl = TextEditingController(text: _place?.name ?? '');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('手动输入地点'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '如：海边公园', labelText: '地点'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (name != null && name.isNotEmpty) {
+      setState(() => _place = PlaceResult(name: name));
+    }
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
       final data = await ApiClient.createEvent(
         happenedAt: _happenedAt,
-        locationName: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
+        locationName: _place?.name,
+        lat: _place?.lat,
+        lng: _place?.lng,
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
         photoBytes: _photos,
       );
@@ -169,15 +204,52 @@ class _RecordPageState extends State<RecordPage> {
               trailing: TextButton(onPressed: _pickDateTime, child: const Text('修改')),
             ),
             // 地点
-            TextField(
-              controller: _locationCtrl,
-              decoration: const InputDecoration(
-                labelText: '地点（可选）',
-                prefixIcon: Icon(Icons.place_outlined),
-                hintText: '如：海边公园',
+            Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: Icon(Icons.place_outlined,
+                    color: _place != null ? Theme.of(context).colorScheme.primary : null),
+                title: Text(
+                  _place != null ? _place!.name : '地点（可选）',
+                  style: TextStyle(
+                    color: _place != null ? null : Colors.grey.shade600,
+                    fontWeight: _place != null ? FontWeight.w600 : null,
+                  ),
+                ),
+                subtitle: _place != null && _place!.lat != null
+                    ? Text(
+                        '${_place!.lat!.toStringAsFixed(4)}, ${_place!.lng!.toStringAsFixed(4)} · 地图定位',
+                        style: const TextStyle(fontSize: 11),
+                      )
+                    : _place != null
+                        ? const Text('手动填写', style: TextStyle(fontSize: 11))
+                        : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_place != null)
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => setState(() => _place = null),
+                        tooltip: '清除地点',
+                      ),
+                    TextButton(onPressed: _pickPlace, child: const Text('地图选点')),
+                  ],
+                ),
+                onTap: _pickPlace,
               ),
             ),
-            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: _manualPlace,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('手动输入'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             // 备注
             TextField(
               controller: _noteCtrl,
