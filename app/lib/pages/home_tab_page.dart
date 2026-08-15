@@ -8,7 +8,10 @@ import 'event_page.dart';
 
 /// 主页：在一起天数 + 下一个纪念日 + 统计 + 最近记录
 class HomeTabPage extends StatefulWidget {
-  const HomeTabPage({super.key});
+  const HomeTabPage({super.key, this.onViewAll});
+
+  /// “查看全部”点击回调（切到时间线 tab）
+  final VoidCallback? onViewAll;
 
   @override
   State<HomeTabPage> createState() => _HomeTabPageState();
@@ -166,9 +169,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
               if (_events.length > 3)
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      // 切到时间线 tab：通过底部导航切换（IndexedStack 已渲染）
-                    },
+                    onPressed: widget.onViewAll,
                     child: const Text('查看全部 →'),
                   ),
                 ),

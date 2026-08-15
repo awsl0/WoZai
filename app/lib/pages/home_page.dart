@@ -22,11 +22,11 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       body: IndexedStack(
         index: _tab,
-        children: const [
-          HomeTabPage(),
-          TimelinePage(),
-          PlacesPage(),
-          SettingsPage(),
+        children: [
+          HomeTabPage(onViewAll: () => setState(() => _tab = 1)),
+          const TimelinePage(),
+          const PlacesPage(),
+          const SettingsPage(),
         ],
       ),
       floatingActionButton: showFab
