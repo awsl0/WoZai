@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
+import '../theme/app_themes.dart';
 
 /// 设置页：AI 配置（BYOK）+ 在一起日期 + 导出 + 后端地址 + 登出
 class SettingsPage extends StatefulWidget {
@@ -18,6 +19,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final _aiBaseUrlCtrl = TextEditingController();
   final _aiKeyCtrl = TextEditingController();
   final _aiModelCtrl = TextEditingController();
+  final _customPromptCtrl = TextEditingController();
   String _style = 'warm';
 
   bool _savingAi = false;
@@ -41,6 +43,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _aiBaseUrlCtrl.dispose();
     _aiKeyCtrl.dispose();
     _aiModelCtrl.dispose();
+    _customPromptCtrl.dispose();
     super.dispose();
   }
 
@@ -54,6 +57,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _aiBaseUrlCtrl.text = cfg['baseUrl'] as String? ?? '';
           _aiModelCtrl.text = cfg['model'] as String? ?? '';
           _style = cfg['style'] as String? ?? 'warm';
+          _customPromptCtrl.text = cfg['customPrompt'] as String? ?? '';
           if (cfg['hasApiKey'] == true) _aiKeyCtrl.text = cfg['apiKeyMasked'] as String? ?? '';
         }
       });
@@ -70,6 +74,7 @@ class _SettingsPageState extends State<SettingsPage> {
         'apiKey': _aiKeyCtrl.text.trim(),
         'model': _aiModelCtrl.text.trim(),
         'style': _style,
+        'customPrompt': _customPromptCtrl.text.trim(),
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AI 配置已保存')));
@@ -164,7 +169,7 @@ class _SettingsPageState extends State<SettingsPage> {
         // 个人信息
         ListTile(
           leading: CircleAvatar(
-            backgroundColor: const Color(0xFFFF6B81),
+            backgroundColor: Theme.of(context).colorScheme.primary,
             child: Text((me?['nickname'] as String? ?? '我').characters.first),
           ),
           title: Text(me?['nickname'] as String? ?? '未登录'),
@@ -173,6 +178,28 @@ class _SettingsPageState extends State<SettingsPage> {
               ? Text('空间 ${members.length}/2 人',
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12))
               : null,
+        ),
+        const Divider(),
+        // 主题
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text('主题', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = 0; i < appThemes.length; i++)
+              ChoiceChip(
+                avatar: Icon(appThemes[i].icon, size: 16),
+                label: Text(appThemes[i].name),
+                selected: Session.instance.themeIndex == i,
+                onSelected: (_) async {
+                  await Session.instance.setThemeIndex(i);
+                  setState(() {});
+                },
+              ),
+          ],
         ),
         const Divider(),
         // AI 配置
@@ -225,6 +252,18 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        // 自定义提示词（可选，非空时替换默认 system prompt）
+        TextField(
+          controller: _customPromptCtrl,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: '自定义提示词（可选）',
+            hintText: '留空使用默认。填写后完全替换默认提示词，建议包含：只描述照片可见事实、推测用“大概/也许”、不编造缺失信息',
+            alignLabelWithHint: true,
+            border: OutlineInputBorder(),
+          ),
+        ),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: _savingAi ? null : _saveAi,
@@ -232,7 +271,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.save_outlined),
           label: const Text('保存 AI 配置'),
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF6B81)),
+          style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary),
         ),
         const Divider(height: 32),
         // 在一起日期

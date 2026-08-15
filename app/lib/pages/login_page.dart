@@ -82,7 +82,7 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.favorite, size: 64, color: Color(0xFFFF6B81)),
+                  Icon(Icons.favorite, size: 64, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 8),
                   Text('WoZai', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium),
                   Text('拍张照，AI 帮你写日记', textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
@@ -129,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                   FilledButton(
                     onPressed: _loading ? null : _submit,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF6B81),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: _loading

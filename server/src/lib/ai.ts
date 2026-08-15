@@ -8,6 +8,8 @@ export interface AiConfigData {
   apiKey: string;
   model: string;
   style: string;
+  /** 用户自定义 system prompt（非空时替换默认） */
+  customPrompt?: string | null;
 }
 
 export interface GenerateContext {
@@ -47,16 +49,19 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
   const style: DiaryStyle = cfg.style === 'literary' ? 'literary' : 'warm';
   const pronoun = ctx.perspective === 'couple' ? '我们' : '我';
 
-  const system = [
-    '你是「WoZai」的日记助手，根据用户提供的照片、时间、地点和备注，写一段温暖的日记。',
-    '规则：',
-    '1. 只描述照片中可见的事实，以及用户提供的时间、地点；照片里看不到的信息不得写成事实。',
-    '2. 对心情、动机的推测必须使用"大概、也许、好像"等不确定语气。',
-    '3. 时间或地点缺失时直接跳过，绝不编造。',
-    '4. 用户没有备注时写 80~150 字的短记录；有备注时围绕备注扩写 150~300 字。',
-    `5. 用第一人称"${pronoun}"。`,
-    `6. 文风要求：${STYLE_RULE[style]}。`,
-  ].join('\n');
+  // 用户自定义提示词：非空时完全替换默认 system prompt
+  const system = cfg.customPrompt?.trim()
+    ? cfg.customPrompt.trim()
+    : [
+        '你是「WoZai」的日记助手，根据用户提供的照片、时间、地点和备注，写一段温暖的日记。',
+        '规则：',
+        '1. 只描述照片中可见的事实，以及用户提供的时间、地点；照片里看不到的信息不得写成事实。',
+        '2. 对心情、动机的推测必须使用"大概、也许、好像"等不确定语气。',
+        '3. 时间或地点缺失时直接跳过，绝不编造。',
+        '4. 用户没有备注时写 80~150 字的短记录；有备注时围绕备注扩写 150~300 字。',
+        `5. 用第一人称"${pronoun}"。`,
+        `6. 文风要求：${STYLE_RULE[style]}。`,
+      ].join('\n');
 
   const text = [
     `时间：${formatTime(ctx.happenedAt)}`,

@@ -71,12 +71,13 @@ model Photo {
 }
 
 model AiConfig {
-  id        String   @id @default(cuid())
-  spaceId   String   @unique
-  baseUrl   String
-  apiKey    String
-  model     String
-  style     String   @default("warm")
-  updatedAt DateTime @updatedAt
-  space     Space    @relation(fields: [spaceId], references: [id])
+  id           String   @id @default(cuid())
+  spaceId      String   @unique
+  baseUrl      String
+  apiKey       String
+  model        String
+  style        String   @default("warm")
+  customPrompt String? // 用户自定义 system prompt（非空时替换默认）
+  updatedAt    DateTime @updatedAt
+  space        Space    @relation(fields: [spaceId], references: [id])
 }

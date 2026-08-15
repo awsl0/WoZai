@@ -242,7 +242,7 @@ class _EventPageState extends State<EventPage> {
                         : const Icon(Icons.auto_awesome),
                     label: Text(e['content'] == null ? '生成日记' : '重新生成'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF6B81),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),

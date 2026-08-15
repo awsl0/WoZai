@@ -192,7 +192,7 @@ class _RecordPageState extends State<RecordPage> {
             FilledButton(
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B81),
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: _saving

@@ -74,7 +74,7 @@ class _HomePageState extends State<HomePage> {
               },
               icon: const Icon(Icons.add_a_photo_outlined),
               label: const Text('记录此刻'),
-              backgroundColor: const Color(0xFFFF6B81),
+              backgroundColor: Theme.of(context).colorScheme.primary,
             )
           : null,
       bottomNavigationBar: NavigationBar(
@@ -101,7 +101,12 @@ class _HomePageState extends State<HomePage> {
                 margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFFFF6B81), Color(0xFFFF9AA8)]),
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -165,7 +170,7 @@ class _HomePageState extends State<HomePage> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                           child: Text(month,
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF6B81))),
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                         ),
                       EventCard(event: e, onTap: () => _openEvent(e)),
                     ],

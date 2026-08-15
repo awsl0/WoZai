@@ -27,6 +27,7 @@ router.get('/ai', async (req, res) => {
       baseUrl: cfg.baseUrl,
       model: cfg.model,
       style: cfg.style,
+      customPrompt: cfg.customPrompt,
       hasApiKey: true,
       apiKeyMasked: maskKey(cfg.apiKey),
     },
@@ -38,6 +39,7 @@ const aiSchema = z.object({
   apiKey: z.string().min(1, 'API Key 不能为空'),
   model: z.string().min(1, '模型名不能为空'),
   style: z.enum(['warm', 'literary']).default('warm'),
+  customPrompt: z.string().max(2000).optional(), // 非空时替换默认 system prompt
 });
 
 // PUT /api/settings/ai —— 保存 AI 配置（空间级共享）
@@ -50,10 +52,18 @@ router.put('/ai', async (req, res) => {
     return res.status(400).json({ error: '参数错误', details: parsed.error.flatten() });
   }
 
+  const data = {
+    baseUrl: parsed.data.baseUrl,
+    apiKey: parsed.data.apiKey,
+    model: parsed.data.model,
+    style: parsed.data.style,
+    customPrompt: parsed.data.customPrompt?.trim() || null,
+  };
+
   const cfg = await prisma.aiConfig.upsert({
     where: { spaceId },
-    create: { spaceId, ...parsed.data },
-    update: parsed.data,
+    create: { spaceId, ...data },
+    update: data,
   });
 
   return res.json({

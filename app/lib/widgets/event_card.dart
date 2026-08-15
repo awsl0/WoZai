@@ -92,10 +92,11 @@ class EventCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B81).withValues(alpha: 0.1),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text('AI 生成', style: TextStyle(fontSize: 10, color: Color(0xFFFF6B81))),
+                    child: Text('AI 生成',
+                        style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
                   ),
                 ],
               ] else
