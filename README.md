@@ -70,9 +70,12 @@ flutter run -d windows   # 或 -d chrome，无需 Android Studio
 | POST | `/api/auth/register` | 注册（自动创建个人空间） | - |
 | POST | `/api/auth/login` | 登录，返回 JWT | - |
 | GET | `/api/auth/me` | 当前用户 + 空间 | ✅ |
+| PUT | `/api/auth/profile` | 修改昵称 | ✅ |
 | GET | `/api/space` | 我的空间（含成员） | ✅ |
 | POST | `/api/space/join` | 邀请码加入（上限 2 人） | ✅ |
 | POST | `/api/space/invite` | 重新生成邀请码（仅 owner） | ✅ |
+| POST | `/api/space/transfer` | 转让空间（仅 owner） | ✅ |
+| PUT | `/api/space/start-date` | 设置/清空在一起日期 | ✅ |
 | POST | `/api/events` | 创建事件（multipart：照片≤9张 + 时间 + 定位 + 备注） | ✅ |
 | GET | `/api/events` | 时间线（倒序，含照片） | ✅ |
 | GET | `/api/events/:id` | 事件详情 | ✅ |
@@ -81,6 +84,7 @@ flutter run -d windows   # 或 -d chrome，无需 Android Studio
 | POST | `/api/events/:id/generate` | AI 看图生成日记（BYOK 多模态） | ✅ |
 | GET | `/api/settings/ai` | 读取 AI 配置（key 脱敏） | ✅ |
 | PUT | `/api/settings/ai` | 保存 AI 配置（空间级共享） | ✅ |
+| GET | `/api/export` | 导出全部事件 + 照片（ZIP） | ✅ |
 
 ## 部署（轻量云）
 

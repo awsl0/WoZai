@@ -83,6 +83,23 @@ router.post('/login', async (req, res) => {
   });
 });
 
+const profileSchema = z.object({
+  nickname: z.string().max(30).optional(),
+});
+
+// PUT /api/auth/profile —— 修改个人信息（昵称）
+router.put('/profile', auth, async (req, res) => {
+  const parsed = profileSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '参数错误' });
+
+  const data: Record<string, unknown> = {};
+  if (parsed.data.nickname !== undefined) data.nickname = parsed.data.nickname;
+  if (Object.keys(data).length === 0) return res.status(400).json({ error: '没有可更新的字段' });
+
+  const user = await prisma.user.update({ where: { id: req.userId }, data });
+  return res.json({ user: { id: user.id, email: user.email, nickname: user.nickname } });
+});
+
 // GET /api/auth/me —— 当前用户 + 所在空间
 router.get('/me', auth, async (req, res) => {
   const user = await prisma.user.findUnique({
