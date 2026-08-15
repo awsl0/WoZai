@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
 import '../theme/app_themes.dart';
+import '../constants/ai_styles.dart';
 
 /// 设置页：AI 配置（BYOK）+ 在一起日期 + 导出 + 后端地址 + 登出
 class SettingsPage extends StatefulWidget {
@@ -19,8 +20,9 @@ class _SettingsPageState extends State<SettingsPage> {
   final _aiBaseUrlCtrl = TextEditingController();
   final _aiKeyCtrl = TextEditingController();
   final _aiModelCtrl = TextEditingController();
-  final _customPromptCtrl = TextEditingController();
-  String _style = 'warm';
+  final _newStyleNameCtrl = TextEditingController();
+  final _newStylePromptCtrl = TextEditingController();
+  List<Map<String, dynamic>> _customStyles = [];
 
   bool _savingAi = false;
   bool _exporting = false;
@@ -43,7 +45,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _aiBaseUrlCtrl.dispose();
     _aiKeyCtrl.dispose();
     _aiModelCtrl.dispose();
-    _customPromptCtrl.dispose();
+    _newStyleNameCtrl.dispose();
+    _newStylePromptCtrl.dispose();
     super.dispose();
   }
 
@@ -56,8 +59,7 @@ class _SettingsPageState extends State<SettingsPage> {
         if (cfg != null) {
           _aiBaseUrlCtrl.text = cfg['baseUrl'] as String? ?? '';
           _aiModelCtrl.text = cfg['model'] as String? ?? '';
-          _style = cfg['style'] as String? ?? 'warm';
-          _customPromptCtrl.text = cfg['customPrompt'] as String? ?? '';
+          _customStyles = (cfg['styles'] as List? ?? []).cast<Map<String, dynamic>>();
           if (cfg['hasApiKey'] == true) _aiKeyCtrl.text = cfg['apiKeyMasked'] as String? ?? '';
         }
       });
@@ -73,8 +75,7 @@ class _SettingsPageState extends State<SettingsPage> {
         'baseUrl': _aiBaseUrlCtrl.text.trim(),
         'apiKey': _aiKeyCtrl.text.trim(),
         'model': _aiModelCtrl.text.trim(),
-        'style': _style,
-        'customPrompt': _customPromptCtrl.text.trim(),
+        'styles': _customStyles,
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AI 配置已保存')));
@@ -85,6 +86,32 @@ class _SettingsPageState extends State<SettingsPage> {
     } finally {
       if (mounted) setState(() => _savingAi = false);
     }
+  }
+
+  void _addCustomStyle() {
+    final name = _newStyleNameCtrl.text.trim();
+    final prompt = _newStylePromptCtrl.text.trim();
+    if (name.isEmpty || prompt.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请填写名字和提示词')));
+      return;
+    }
+    if (presetStyleNames.contains(name)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('这个名字与内置文风重名，换个名字')));
+      return;
+    }
+    if (_customStyles.any((s) => s['name'] == name)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已有同名文风')));
+      return;
+    }
+    setState(() {
+      _customStyles.add({'name': name, 'prompt': prompt});
+      _newStyleNameCtrl.clear();
+      _newStylePromptCtrl.clear();
+    });
+  }
+
+  void _removeCustomStyle(int index) {
+    setState(() => _customStyles.removeAt(index));
   }
 
   Future<void> _setStartDate() async {
@@ -232,38 +259,69 @@ class _SettingsPageState extends State<SettingsPage> {
           decoration: const InputDecoration(labelText: 'API Key', hintText: 'sk-...'),
         ),
         const SizedBox(height: 8),
-        Row(
+        TextField(
+          controller: _aiModelCtrl,
+          decoration: const InputDecoration(labelText: '模型', hintText: 'qwen-vl-max'),
+        ),
+        const SizedBox(height: 16),
+        // 文风
+        const Text('文风（生成日记时选择）', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _aiModelCtrl,
-                decoration: const InputDecoration(labelText: '模型', hintText: 'qwen-vl-max'),
+            for (final name in presetStyleNames)
+              Chip(
+                avatar: const Icon(Icons.auto_awesome, size: 14),
+                label: Text(name),
+                visualDensity: VisualDensity.compact,
               ),
-            ),
-            const SizedBox(width: 12),
-            DropdownButton<String>(
-              value: _style,
-              underline: const SizedBox.shrink(),
-              items: const [
-                DropdownMenuItem(value: 'warm', child: Text('温暖日常')),
-                DropdownMenuItem(value: 'literary', child: Text('文艺')),
-              ],
-              onChanged: (v) => setState(() => _style = v ?? 'warm'),
-            ),
           ],
         ),
         const SizedBox(height: 8),
-        // 自定义提示词（可选，非空时替换默认 system prompt）
+        // 自定义文风：添加
         TextField(
-          controller: _customPromptCtrl,
-          maxLines: 4,
+          controller: _newStyleNameCtrl,
+          decoration: const InputDecoration(labelText: '自定义文风名字', hintText: '如：古诗风 / 情侣日常', isDense: true),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _newStylePromptCtrl,
+          maxLines: 3,
           decoration: const InputDecoration(
-            labelText: '自定义提示词（可选）',
-            hintText: '留空使用默认。填写后完全替换默认提示词，建议包含：只描述照片可见事实、推测用“大概/也许”、不编造缺失信息',
+            labelText: '提示词（完全替换默认，建议含幻觉约束）',
+            hintText: '如：用古诗风格写，只写照片里看到的，不编造缺失信息',
             alignLabelWithHint: true,
             border: OutlineInputBorder(),
           ),
         ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: _addCustomStyle,
+            icon: const Icon(Icons.add),
+            label: const Text('添加文风'),
+          ),
+        ),
+        // 自定义文风列表
+        for (var i = 0; i < _customStyles.length; i++)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.style_outlined, size: 20),
+            title: Text(_customStyles[i]['name'] as String),
+            subtitle: Text(
+              (_customStyles[i]['prompt'] as String),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              onPressed: () => _removeCustomStyle(i),
+            ),
+          ),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: _savingAi ? null : _saveAi,

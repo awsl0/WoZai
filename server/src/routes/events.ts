@@ -142,7 +142,7 @@ router.delete('/:id', async (req, res) => {
 
 // ---- AI 生成日记：POST /api/events/:id/generate ----
 const generateSchema = z.object({
-  style: z.enum(['warm', 'literary']).optional(),
+  style: z.string().max(50).optional(), // 文风名：内置（温暖/文艺/浪漫/简洁/痛苦）或自定义名
   usePhotos: z.boolean().optional(), // false = 纯文本模式（模型不支持图片时）
 });
 

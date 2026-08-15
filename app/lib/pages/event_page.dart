@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
+import '../constants/ai_styles.dart';
 
 /// 事件详情页：照片 + 时间/地点 + 备注 + AI 生成/重新生成 + 编辑正文 + 删除
 class EventPage extends StatefulWidget {
@@ -20,8 +21,9 @@ class _EventPageState extends State<EventPage> {
   bool _generating = false;
 
   late final TextEditingController _contentCtrl;
-  String _style = 'warm';
+  String _style = '温暖';
   bool _usePhotos = true;
+  List<String> _customStyleNames = [];
 
   @override
   void initState() {
@@ -39,6 +41,14 @@ class _EventPageState extends State<EventPage> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
+      // 加载自定义文风（生成时可选）
+      try {
+        final aiData = await ApiClient.request('GET', '/api/settings/ai');
+        final styles = (aiData['aiConfig']?['styles'] as List?) ?? [];
+        _customStyleNames = styles.map((s) => (s as Map)['name'] as String).toList();
+      } catch (_) {
+        // 设置读取失败不阻塞事件加载
+      }
       final data = await ApiClient.request('GET', '/api/events/${widget.eventId}');
       if (!mounted) return;
       setState(() {
@@ -205,11 +215,11 @@ class _EventPageState extends State<EventPage> {
                 DropdownButton<String>(
                   value: _style,
                   underline: const SizedBox.shrink(),
-                  items: const [
-                    DropdownMenuItem(value: 'warm', child: Text('温暖日常')),
-                    DropdownMenuItem(value: 'literary', child: Text('文艺')),
+                  items: [
+                    for (final name in [...presetStyleNames, ..._customStyleNames])
+                      DropdownMenuItem(value: name, child: Text(name)),
                   ],
-                  onChanged: (v) => setState(() => _style = v ?? 'warm'),
+                  onChanged: (v) => setState(() => _style = v ?? '温暖'),
                 ),
               ],
             ),

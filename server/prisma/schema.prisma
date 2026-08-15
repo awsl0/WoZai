@@ -71,13 +71,13 @@ model Photo {
 }
 
 model AiConfig {
-  id           String   @id @default(cuid())
-  spaceId      String   @unique
-  baseUrl      String
-  apiKey       String
-  model        String
-  style        String   @default("warm")
-  customPrompt String? // 用户自定义 system prompt（非空时替换默认）
-  updatedAt    DateTime @updatedAt
-  space        Space    @relation(fields: [spaceId], references: [id])
+  id        String   @id @default(cuid())
+  spaceId   String   @unique
+  baseUrl   String
+  apiKey    String
+  model     String
+  style     String   @default("温暖") // 默认文风名（生成时可临时切换）
+  styles    Json?    // 自定义文风列表 [{ name, prompt }]
+  updatedAt DateTime @updatedAt
+  space     Space    @relation(fields: [spaceId], references: [id])
 }

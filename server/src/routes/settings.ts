@@ -27,19 +27,24 @@ router.get('/ai', async (req, res) => {
       baseUrl: cfg.baseUrl,
       model: cfg.model,
       style: cfg.style,
-      customPrompt: cfg.customPrompt,
+      styles: (cfg.styles as { name: string; prompt: string }[] | null) ?? [],
       hasApiKey: true,
       apiKeyMasked: maskKey(cfg.apiKey),
     },
   });
 });
 
+const styleItemSchema = z.object({
+  name: z.string().min(1, '文风名字不能为空').max(30),
+  prompt: z.string().min(1, '提示词不能为空').max(2000),
+});
+
 const aiSchema = z.object({
   baseUrl: z.string().url('Base URL 格式不正确'),
   apiKey: z.string().min(1, 'API Key 不能为空'),
   model: z.string().min(1, '模型名不能为空'),
-  style: z.enum(['warm', 'literary']).default('warm'),
-  customPrompt: z.string().max(2000).optional(), // 非空时替换默认 system prompt
+  style: z.string().max(50).optional(),
+  styles: z.array(styleItemSchema).max(10).optional(), // 自定义文风列表
 });
 
 // PUT /api/settings/ai —— 保存 AI 配置（空间级共享）
@@ -52,17 +57,24 @@ router.put('/ai', async (req, res) => {
     return res.status(400).json({ error: '参数错误', details: parsed.error.flatten() });
   }
 
-  const data = {
+  const data: Record<string, unknown> = {
     baseUrl: parsed.data.baseUrl,
     apiKey: parsed.data.apiKey,
     model: parsed.data.model,
-    style: parsed.data.style,
-    customPrompt: parsed.data.customPrompt?.trim() || null,
   };
+  if (parsed.data.style !== undefined) data.style = parsed.data.style;
+  if (parsed.data.styles !== undefined) data.styles = parsed.data.styles;
 
   const cfg = await prisma.aiConfig.upsert({
     where: { spaceId },
-    create: { spaceId, ...data },
+    create: {
+      spaceId,
+      baseUrl: parsed.data.baseUrl,
+      apiKey: parsed.data.apiKey,
+      model: parsed.data.model,
+      style: parsed.data.style ?? '温暖',
+      styles: parsed.data.styles,
+    },
     update: data,
   });
 
