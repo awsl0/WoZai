@@ -106,6 +106,10 @@ docker compose up -d
 | API Key | 你的密钥 | `sk-...` |
 | 模型 | 多模态模型名 | `qwen-vl-max` / `glm-4v-plus` / `gpt-4o` |
 
+常用预设（设置页一键填入）：通义 `dashscope.../v1` + `qwen-vl-max`；智谱 `open.bigmodel.cn/api/paas/v4` + `glm-4v-plus`；OpenAI `api.openai.com/v1` + `gpt-4o`。
+
+> **模型不支持图片？** 生成时关闭「使用照片」开关（`usePhotos:false`），自动降级为纯文本模式——只用时间/地点/备注生成，不编造画面。
+>
 > 隐私说明：照片与上下文会发送到你**自己配置的** AI 服务商；项目本身不收集任何数据。
 
 ## 隐私与合规

@@ -143,6 +143,7 @@ router.delete('/:id', async (req, res) => {
 // ---- AI 生成日记：POST /api/events/:id/generate ----
 const generateSchema = z.object({
   style: z.enum(['warm', 'literary']).optional(),
+  usePhotos: z.boolean().optional(), // false = 纯文本模式（模型不支持图片时）
 });
 
 router.post('/:id/generate', async (req, res) => {
@@ -152,12 +153,13 @@ router.post('/:id/generate', async (req, res) => {
   const aiConfig = await prisma.aiConfig.findUnique({ where: { spaceId: event.spaceId } });
   if (!aiConfig) return res.status(400).json({ error: '请先在设置中配置 AI（Base URL / API Key / 模型）' });
 
-  if (event.photos.length === 0) {
-    return res.status(400).json({ error: '这个事件没有照片，无法看图生成' });
-  }
-
   const parsed = generateSchema.safeParse(req.body ?? {});
   const style = parsed.success && parsed.data.style ? parsed.data.style : aiConfig.style;
+  const usePhotos = parsed.success ? (parsed.data.usePhotos ?? true) : true;
+
+  if (usePhotos && event.photos.length === 0) {
+    return res.status(400).json({ error: '这个事件没有照片，无法看图生成（可请求时传 usePhotos:false 用纯文本模式）' });
+  }
 
   const memberCount = await prisma.spaceMember.count({ where: { spaceId: event.spaceId } });
 
@@ -168,7 +170,8 @@ router.post('/:id/generate', async (req, res) => {
         happenedAt: event.happenedAt,
         locationName: event.locationName,
         note: event.note,
-        photoPaths: event.photos.map((p) => p.filePath),
+        photoPaths: usePhotos ? event.photos.map((p) => p.filePath) : [],
+        usePhotos,
         perspective: memberCount > 1 ? 'couple' : 'solo',
       },
     );

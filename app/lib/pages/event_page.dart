@@ -21,6 +21,7 @@ class _EventPageState extends State<EventPage> {
 
   late final TextEditingController _contentCtrl;
   String _style = 'warm';
+  bool _usePhotos = true;
 
   @override
   void initState() {
@@ -55,7 +56,7 @@ class _EventPageState extends State<EventPage> {
     setState(() => _generating = true);
     try {
       final data = await ApiClient.request('POST', '/api/events/${widget.eventId}/generate',
-          body: {'style': _style});
+          body: {'style': _style, 'usePhotos': _usePhotos});
       if (!mounted) return;
       setState(() {
         _event = data['event'] as Map<String, dynamic>;
@@ -212,6 +213,15 @@ class _EventPageState extends State<EventPage> {
                 ),
               ],
             ),
+            if (photos.isNotEmpty)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('使用照片生成', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('模型不支持图片时请关闭（纯文本模式）', style: TextStyle(fontSize: 11)),
+                value: _usePhotos,
+                onChanged: (v) => setState(() => _usePhotos = v),
+              ),
             const SizedBox(height: 8),
             TextField(
               controller: _contentCtrl,

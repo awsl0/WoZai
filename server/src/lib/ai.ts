@@ -15,6 +15,8 @@ export interface GenerateContext {
   locationName: string | null;
   note: string | null;
   photoPaths: string[];
+  /** false = 纯文本模式（模型不支持图片时降级用） */
+  usePhotos: boolean;
   /** couple = 双人空间(用"我们")；solo = 单人空间(用"我") */
   perspective: 'couple' | 'solo';
 }
@@ -60,12 +62,16 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
     `时间：${formatTime(ctx.happenedAt)}`,
     `地点：${ctx.locationName ?? '未知'}`,
     `用户备注：${ctx.note ?? '无'}`,
-    `照片共 ${ctx.photoPaths.length} 张：`,
+    ctx.usePhotos && ctx.photoPaths.length > 0
+      ? `照片共 ${ctx.photoPaths.length} 张：`
+      : '（本次没有提供照片：请仅根据时间、地点和备注描述情景，不要编造具体画面）',
   ].join('\n');
 
   const userContent: unknown[] = [{ type: 'text', text }];
-  for (const p of ctx.photoPaths) {
-    userContent.push({ type: 'image_url', image_url: { url: await fileToDataUrl(p) } });
+  if (ctx.usePhotos) {
+    for (const p of ctx.photoPaths) {
+      userContent.push({ type: 'image_url', image_url: { url: await fileToDataUrl(p) } });
+    }
   }
 
   const baseUrl = cfg.baseUrl.replace(/\/+$/, '');
@@ -87,11 +93,18 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    // 模型不支持图片输入时的友好提示
+    if (res.status === 400 && /image|vision|multimodal|picture|图片|视觉/i.test(body)) {
+      throw new Error('该模型可能不支持图片输入：可在生成时关闭「使用照片」，改为纯文本模式重试');
+    }
     throw new Error(`AI 请求失败 (${res.status}): ${body.slice(0, 300)}`);
   }
 
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
   const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error('AI 返回内容为空');
+  if (!content) {
+    const raw = JSON.stringify(data).slice(0, 200);
+    throw new Error(`AI 返回内容为空（可能被截断或模型不支持该请求）：${raw}`);
+  }
   return content;
 }
