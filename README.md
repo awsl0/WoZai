@@ -65,6 +65,18 @@ flutter run -d windows   # 或 -d chrome，无需 Android Studio
 
 > App 首次启动需在"设置"中配置后端地址（如 `http://localhost:3000`）与 AI 配置。
 
+### 换电脑 / 新环境开发
+
+```bash
+git clone https://github.com/awsl0/WoZai.git && cd WoZai
+# 后端
+cd server && npm install && cp .env.example .env && npx prisma migrate deploy && npm run dev
+# 客户端（需先装 Flutter SDK，见 https://flutter.dev）
+cd ../app && flutter pub get && flutter run -d chrome
+```
+
+> ⚠️ 本地数据（`server/.env`、`server/prisma/dev.db`、`server/uploads/`）不随仓库同步，新环境需重新注册账号、重新配置 AI。如需迁移数据，用旧环境的导出功能（设置 → 导出全部数据）或直接拷贝上述文件。
+
 ## API 概览（当前已实现）
 
 | 方法 | 路径 | 说明 | 鉴权 |
