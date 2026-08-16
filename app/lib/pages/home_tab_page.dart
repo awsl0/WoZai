@@ -153,25 +153,31 @@ class _HomeTabPageState extends State<HomeTabPage> {
                               const Icon(Icons.favorite,
                                   color: Color(0xFFD81B60), size: 20),
                             const SizedBox(width: 6),
+                            // FittedBox 自适应缩放：任何屏幕宽度/字体大小都完整显示不截断
                             Flexible(
-                              child: Text(
-                                together ??
-                                    (me?['nickname'] as String? ?? '我的记录'),
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  together ??
+                                      (me?['nickname'] as String? ?? '我的记录'),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600),
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        Text(
-                          upcoming != null
-                              ? '还有 ${upcoming.daysLeft} 天 · ${upcoming.name}'
-                              : '记录每一天',
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            upcoming != null
+                                ? '还有 ${upcoming.daysLeft} 天 · ${upcoming.name}'
+                                : '记录每一天',
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
