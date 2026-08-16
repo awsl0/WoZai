@@ -7,7 +7,7 @@
 ## 如何获取商业授权
 
 - 通过 GitHub Issue：请在 [wozai/WoZai](https://github.com/awsl0/WoZai) 仓库提交 Issue 并注明“商业授权咨询”，最好附上你的使用场景
-- 或发送邮件至：`REPLACE_ME_WITH_YOUR_EMAIL`（项目所有者收）
+- 或发送邮件至：`ywjsn552566@163.com`（项目所有者收）
 
 ## 授权内容
 
