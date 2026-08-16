@@ -41,7 +41,8 @@ const styleItemSchema = z.object({
 
 const aiSchema = z.object({
   baseUrl: z.string().url('Base URL 格式不正确'),
-  apiKey: z.string().min(1, 'API Key 不能为空'),
+  // apiKey 可选：不传/为空 = 保留已保存的 key（避免前端把脱敏值写回）
+  apiKey: z.string().min(1, 'API Key 不能为空').optional(),
   model: z.string().min(1, '模型名不能为空'),
   style: z.string().max(50).optional(),
   styles: z.array(styleItemSchema).max(10).optional(), // 自定义文风列表
@@ -57,11 +58,19 @@ router.put('/ai', async (req, res) => {
     return res.status(400).json({ error: '参数错误', details: parsed.error.flatten() });
   }
 
+  // 首次创建（还没有配置）时必须提供 apiKey
+  const existing = await prisma.aiConfig.findUnique({ where: { spaceId } });
+  const newKey = parsed.data.apiKey?.trim();
+  if (!existing && !newKey) {
+    return res.status(400).json({ error: '请填写 API Key' });
+  }
+
   const data: Record<string, unknown> = {
     baseUrl: parsed.data.baseUrl,
-    apiKey: parsed.data.apiKey,
     model: parsed.data.model,
   };
+  // 只有用户真正填写了新 key 才覆盖（前端未改时不传）
+  if (newKey) data.apiKey = newKey;
   if (parsed.data.style !== undefined) data.style = parsed.data.style;
   if (parsed.data.styles !== undefined) data.styles = parsed.data.styles;
 
@@ -70,7 +79,8 @@ router.put('/ai', async (req, res) => {
     create: {
       spaceId,
       baseUrl: parsed.data.baseUrl,
-      apiKey: parsed.data.apiKey,
+      // upsert 会校验 create 分支：existing 存在时走 update，这里给个非空兑底即可
+      apiKey: newKey ?? '',
       model: parsed.data.model,
       style: parsed.data.style ?? '温暖',
       styles: parsed.data.styles,

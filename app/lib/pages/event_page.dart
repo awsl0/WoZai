@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
 import '../constants/ai_styles.dart';
+import 'event_edit_page.dart';
 
 /// 事件详情页：照片 + 时间/地点 + 备注 + AI 生成/重新生成 + 编辑正文 + 删除
 class EventPage extends StatefulWidget {
@@ -94,6 +95,15 @@ class _EventPageState extends State<EventPage> {
     }
   }
 
+  Future<void> _edit() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EventEditPage(eventId: widget.eventId, event: _event!),
+      ),
+    );
+    if (changed == true && mounted) _load();
+  }
+
   Future<void> _delete() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -153,6 +163,7 @@ class _EventPageState extends State<EventPage> {
       appBar: AppBar(
         title: const Text('事件详情'),
         actions: [
+          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: _edit, tooltip: '编辑'),
           IconButton(icon: const Icon(Icons.delete_outline), onPressed: _delete, tooltip: '删除'),
         ],
       ),

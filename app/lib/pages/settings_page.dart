@@ -30,6 +30,8 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _testingAi = false;
   /// 用户是否改动过 API Key（区分 masked 显示值与真实输入）
   bool _aiKeyTouched = false;
+  /// 已保存 key 的掩码（如 sk-1***wq），用于输入框提示
+  String? _savedKeyMasked;
   bool _exporting = false;
   bool _showStyleForm = false; // 点「添加文风」才显示输入框
 
@@ -81,7 +83,8 @@ class _SettingsPageState extends State<SettingsPage> {
           _aiBaseUrlCtrl.text = cfg['baseUrl'] as String? ?? '';
           _aiModelCtrl.text = cfg['model'] as String? ?? '';
           _customStyles = (cfg['styles'] as List? ?? []).cast<Map<String, dynamic>>();
-          if (cfg['hasApiKey'] == true) _aiKeyCtrl.text = cfg['apiKeyMasked'] as String? ?? '';
+          // 已保存的 key 只显示掩码提示，不填入输入框（避免保存时把脱敏值写回覆盖真 key）
+          _savedKeyMasked = (cfg['hasApiKey'] == true) ? (cfg['apiKeyMasked'] as String? ?? '') : null;
         }
       });
     } catch (_) {
@@ -120,7 +123,8 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       await ApiClient.request('PUT', '/api/settings/ai', body: {
         'baseUrl': _aiBaseUrlCtrl.text.trim(),
-        'apiKey': _aiKeyCtrl.text.trim(),
+        // 用户没输入新 key 时不传，服务器保留已保存的 key
+        if (_aiKeyTouched) 'apiKey': _aiKeyCtrl.text.trim(),
         'model': _aiModelCtrl.text.trim(),
         'styles': _customStyles,
       });
@@ -533,7 +537,10 @@ class _SettingsPageState extends State<SettingsPage> {
         TextField(
           controller: _aiKeyCtrl,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'API Key', hintText: 'sk-...'),
+          decoration: InputDecoration(
+            labelText: 'API Key',
+            hintText: _savedKeyMasked != null ? '已保存：$_savedKeyMasked（留空保持不变）' : 'sk-...',
+          ),
           onChanged: (_) => _aiKeyTouched = true,
         ),
         const SizedBox(height: 8),

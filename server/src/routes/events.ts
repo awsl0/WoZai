@@ -113,6 +113,8 @@ const updateSchema = z.object({
   note: z.string().max(500).nullable().optional(),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
+  // 编辑时按新时间/地点重新获取的天气（JSON 字符串或 null 清除）
+  weather: z.string().nullable().optional(),
 });
 
 // ---- 编辑事件（用户手动改正文时置 editedByUser=true） ----
@@ -144,6 +146,18 @@ router.put('/:id', async (req, res) => {
   if (parsed.data.note !== undefined) data.note = parsed.data.note;
   if (parsed.data.lat !== undefined) data.lat = parsed.data.lat;
   if (parsed.data.lng !== undefined) data.lng = parsed.data.lng;
+  if (parsed.data.weather !== undefined) {
+    if (parsed.data.weather === null || parsed.data.weather.trim() === '') {
+      data.weather = null;
+    } else {
+      try {
+        const w = JSON.parse(parsed.data.weather) as Record<string, unknown>;
+        if (w && typeof w.text === 'string') data.weather = w as never;
+      } catch {
+        // 天气格式错误则忽略（保持原值）
+      }
+    }
+  }
 
   const updated = await prisma.event.update({
     where: { id: event.id },
@@ -161,7 +175,42 @@ router.delete('/:id', async (req, res) => {
   for (const p of event.photos) {
     fs.unlink(p.filePath, () => {});
   }
+  // 先删照片记录再删事件（避免外键约束冲突）
+  await prisma.photo.deleteMany({ where: { eventId: event.id } });
   await prisma.event.delete({ where: { id: event.id } });
+  return res.json({ ok: true });
+});
+
+// ---- 追加照片：POST /api/events/:id/photos（上限合计 9 张） ----
+router.post('/:id/photos', upload.array('photos', 9), async (req, res) => {
+  const event = await getOwnedEvent(req.userId!, String(req.params.id));
+  if (!event) return res.status(404).json({ error: '事件不存在' });
+
+  const files = (req.files as Express.Multer.File[]) ?? [];
+  if (files.length === 0) return res.status(400).json({ error: '没有收到照片文件' });
+  if (event.photos.length + files.length > 9) {
+    for (const f of files) fs.unlink(f.path, () => {});
+    return res.status(400).json({ error: '每个事件最多 9 张照片' });
+  }
+
+  const photos = await prisma.$transaction(
+    files.map((f) =>
+      prisma.photo.create({ data: { eventId: event.id, filePath: f.path.replace(/\\/g, '/') } }),
+    ),
+  );
+  return res.status(201).json({ photos });
+});
+
+// ---- 删除照片：DELETE /api/events/:id/photos/:photoId ----
+router.delete('/:id/photos/:photoId', async (req, res) => {
+  const event = await getOwnedEvent(req.userId!, req.params.id);
+  if (!event) return res.status(404).json({ error: '事件不存在' });
+
+  const photo = event.photos.find((p) => p.id === String(req.params.photoId));
+  if (!photo) return res.status(404).json({ error: '照片不存在' });
+
+  fs.unlink(photo.filePath, () => {});
+  await prisma.photo.delete({ where: { id: photo.id } });
   return res.json({ ok: true });
 });
 

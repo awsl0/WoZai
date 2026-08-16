@@ -66,6 +66,29 @@ class ApiClient {
     throw ApiException(res.statusCode, decoded?['error']?.toString() ?? '请求失败(${res.statusCode})');
   }
 
+  /// 追加照片到已有事件（multipart）→ 返回新增照片列表
+  static Future<dynamic> addEventPhotos(String eventId, List<Uint8List> photoBytes) async {
+    final base = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.parse('$base/api/events/$eventId/photos');
+    final req = http.MultipartRequest('POST', uri);
+    if (Session.instance.token != null) {
+      req.headers['Authorization'] = 'Bearer ${Session.instance.token}';
+    }
+    for (var i = 0; i < photoBytes.length; i++) {
+      req.files.add(http.MultipartFile.fromBytes('photos', photoBytes[i], filename: 'photo$i.jpg'));
+    }
+    final streamed = await req.send();
+    final res = await http.Response.fromStream(streamed);
+    final decoded = _decode(res.body);
+    if (res.statusCode >= 200 && res.statusCode < 300) return decoded;
+    throw ApiException(res.statusCode, decoded?['error']?.toString() ?? '上传失败(${res.statusCode})');
+  }
+
+  /// 删除事件的一张照片
+  static Future<dynamic> deleteEventPhoto(String eventId, String photoId) {
+    return request('DELETE', '/api/events/$eventId/photos/$photoId');
+  }
+
   /// 下载（导出 ZIP 用），返回字节
   static Future<Uint8List> download(String path) async {
     final base = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');

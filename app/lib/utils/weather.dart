@@ -52,6 +52,7 @@ String weatherTextOf(int code) {
 }
 
 /// 按日期 + 坐标获取当天天气（Open-Meteo，无需 API key）
+/// 近 92 天用 forecast API；更早的日期用 archive API（1940 年至今）
 /// 返回 { code, text, temp }，失败返回 null（不阻塞记录）
 Future<Map<String, dynamic>?> fetchWeather({
   required DateTime date,
@@ -60,13 +61,19 @@ Future<Map<String, dynamic>?> fetchWeather({
 }) async {
   final day =
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  // 距今超过 90 天 → 历史天气 Archive API（响应结构与 forecast 一致）
+  final isHistoric =
+      DateTime.now().difference(DateTime(date.year, date.month, date.day)).inDays > 90;
+  final host = isHistoric
+      ? 'https://archive-api.open-meteo.com/v1/archive'
+      : 'https://api.open-meteo.com/v1/forecast';
   final uri = Uri.parse(
-      'https://api.open-meteo.com/v1/forecast'
+      '$host'
       '?latitude=$lat&longitude=$lng'
       '&daily=weather_code,temperature_2m_max,temperature_2m_min'
       '&timezone=auto&start_date=$day&end_date=$day');
   try {
-    final res = await http.get(uri).timeout(const Duration(seconds: 8));
+    final res = await http.get(uri).timeout(const Duration(seconds: 10));
     if (res.statusCode != 200) return null;
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final daily = data['daily'] as Map<String, dynamic>?;

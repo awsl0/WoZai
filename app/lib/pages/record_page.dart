@@ -32,7 +32,8 @@ class _RecordPageState extends State<RecordPage> {
 
   Future<void> _pickPhotos() async {
     try {
-      final files = await _picker.pickMultiImage(imageQuality: 85, maxWidth: 1600);
+      // 压缩到 1200px/quality80（约 200-400KB/张），AI 生成与上传都更快
+      final files = await _picker.pickMultiImage(imageQuality: 80, maxWidth: 1200);
       if (files.isEmpty) return;
       for (final f in files) {
         final bytes = await f.readAsBytes();

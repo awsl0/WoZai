@@ -94,12 +94,16 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
 
   const userContent: unknown[] = [{ type: 'text', text }];
   if (ctx.usePhotos) {
-    for (const p of ctx.photoPaths) {
+    // 提速：最多取前 3 张照片参与生成（照片多时其余忽略，避免请求体过大拖慢响应）
+    const photoPaths = ctx.photoPaths.slice(0, 3);
+    for (const p of photoPaths) {
       userContent.push({ type: 'image_url', image_url: { url: await fileToDataUrl(p) } });
     }
   }
 
   const baseUrl = cfg.baseUrl.replace(/\/+$/, '');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90000); // 90s 超时保护
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -113,8 +117,11 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
         { role: 'user', content: userContent },
       ],
       temperature: 0.8,
+      max_tokens: 700,
     }),
+    signal: controller.signal,
   });
+  clearTimeout(timer);
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -125,7 +132,12 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
     throw new Error(`AI 请求失败 (${res.status}): ${body.slice(0, 300)}`);
   }
 
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  let data: { choices?: { message?: { content?: string } }[] };
+  try {
+    data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  } catch (e) {
+    throw new Error('AI 返回内容无法解析');
+  }
   const content = data.choices?.[0]?.message?.content?.trim();
   if (!content) {
     const raw = JSON.stringify(data).slice(0, 200);
