@@ -27,6 +27,9 @@ class _SettingsPageState extends State<SettingsPage> {
   List<Map<String, dynamic>> _customStyles = [];
 
   bool _savingAi = false;
+  bool _testingAi = false;
+  /// 用户是否改动过 API Key（区分 masked 显示值与真实输入）
+  bool _aiKeyTouched = false;
   bool _exporting = false;
   bool _showStyleForm = false; // 点「添加文风」才显示输入框
 
@@ -86,6 +89,32 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  /// 测试当前 AI 配置（未改动的 key 用已保存的）
+  Future<void> _testAi() async {
+    setState(() => _testingAi = true);
+    try {
+      final r = await ApiClient.request('POST', '/api/settings/ai/test', body: {
+        'baseUrl': _aiBaseUrlCtrl.text.trim(),
+        if (_aiKeyTouched) 'apiKey': _aiKeyCtrl.text.trim(),
+        'model': _aiModelCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      final ok = r?['ok'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok
+            ? '✅ 连接成功（${r?['model'] ?? ''}）：${r?['reply'] ?? ''}'
+            : '❌ 测试失败：${r?['error'] ?? '未知错误'}'),
+        backgroundColor: ok ? Colors.green.shade700 : null,
+      ));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ 测试失败：${e.message}')));
+    } finally {
+      if (mounted) setState(() => _testingAi = false);
+    }
+  }
+
   Future<void> _saveAi() async {
     setState(() => _savingAi = true);
     try {
@@ -138,7 +167,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final date = await showDatePicker(
       context: context,
       initialDate: current?.toLocal() ?? DateTime.now(),
-      firstDate: DateTime(2000),
+      firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
     if (date == null || !mounted) return;
@@ -283,7 +312,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     final d = await showDatePicker(
                       context: ctx,
                       initialDate: picked,
-                      firstDate: DateTime(2000),
+                      firstDate: DateTime(1900),
                       lastDate: DateTime(2100),
                     );
                     if (d != null) setDlg(() => picked = d);
@@ -505,20 +534,36 @@ class _SettingsPageState extends State<SettingsPage> {
           controller: _aiKeyCtrl,
           obscureText: true,
           decoration: const InputDecoration(labelText: 'API Key', hintText: 'sk-...'),
+          onChanged: (_) => _aiKeyTouched = true,
         ),
         const SizedBox(height: 8),
         TextField(
           controller: _aiModelCtrl,
           decoration: const InputDecoration(labelText: '模型', hintText: 'qwen-vl-max'),
         ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: _savingAi ? null : _saveAi,
-          icon: _savingAi
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.save_outlined),
-          label: const Text('保存 AI 配置'),
-          style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _savingAi ? null : _saveAi,
+                icon: _savingAi
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: const Text('保存 AI 配置'),
+                style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 测试按钮：验证当前配置能否连通
+            OutlinedButton.icon(
+              onPressed: _testingAi ? null : _testAi,
+              icon: _testingAi
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.network_check, size: 18),
+              label: const Text('测试'),
+            ),
+          ],
         ),
         const Divider(height: 32),
         // 文风

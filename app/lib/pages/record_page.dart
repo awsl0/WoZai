@@ -51,7 +51,7 @@ class _RecordPageState extends State<RecordPage> {
     final date = await showDatePicker(
       context: context,
       initialDate: _happenedAt.isAfter(DateTime.now()) ? DateTime.now() : _happenedAt,
-      firstDate: DateTime(2000),
+      firstDate: DateTime(1900),
       // 只能选今天及之前的日期，不允许记录未来的事
       lastDate: DateTime.now(),
     );

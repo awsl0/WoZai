@@ -83,4 +83,56 @@ router.put('/ai', async (req, res) => {
   });
 });
 
+// POST /api/settings/ai/test —— 测试 AI 配置是否可用
+// body 可选传 baseUrl/apiKey/model（前端表单临时值，未传则用已保存配置）
+router.post('/ai/test', async (req, res) => {
+  const spaceId = await mySpaceId(req.userId!);
+  if (!spaceId) return res.status(404).json({ error: '还没有空间' });
+
+  const body = (req.body ?? {}) as { baseUrl?: string; apiKey?: string; model?: string };
+  let baseUrl = body.baseUrl?.trim();
+  let apiKey = body.apiKey?.trim();
+  let model = body.model?.trim();
+
+  if (!baseUrl || !apiKey || !model) {
+    const cfg = await prisma.aiConfig.findUnique({ where: { spaceId } });
+    baseUrl = baseUrl || cfg?.baseUrl || '';
+    apiKey = apiKey || cfg?.apiKey || '';
+    model = model || cfg?.model || '';
+  }
+  if (!baseUrl || !apiKey || !model) {
+    return res.status(400).json({ ok: false, error: '请先填写 AI 配置' });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    const r = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: '请只回复两个字：正常' }],
+        max_tokens: 256,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      return res.json({ ok: false, error: `HTTP ${r.status}: ${t.slice(0, 200)}` });
+    }
+    const data = (await r.json()) as { choices?: { message?: { content?: string } }[]; model?: string };
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) return res.json({ ok: false, error: '返回内容为空' });
+    return res.json({ ok: true, model: data.model ?? model, reply: content.trim().slice(0, 50) });
+  } catch (e) {
+    const err = e as Error & { name?: string };
+    return res.json({
+      ok: false,
+      error: err?.name === 'AbortError' ? '请求超时（20 秒）' : `连接失败: ${err?.message ?? e}`,
+    });
+  }
+});
+
 export default router;

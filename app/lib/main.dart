@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'pages/login_page.dart';
 import 'pages/home_page.dart';
 import 'state/session.dart';
@@ -22,6 +23,14 @@ class WozaiApp extends StatelessWidget {
         return MaterialApp(
           title: 'WoZai',
           debugShowCheckedModeBanner: false,
+          // 中文界面（日期选择器等系统组件本地化）
+          locale: const Locale('zh'),
+          supportedLocales: const [Locale('zh'), Locale('en')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           theme: buildTheme(spec),
           initialRoute: Session.instance.isLoggedIn ? '/home' : '/login',
           routes: {
