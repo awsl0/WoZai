@@ -10,12 +10,6 @@
 
 客户端为 Flutter（Android / iOS / Web / 桌面），后端为 Node.js + TypeScript + Express + Prisma + SQLite（零数据库依赖，单文件即用）。
 
-## 🚀 在线体验
-
-> 🌐 **https://81.70.172.177:8080** —— 打开即玩，无需安装
->
-> 体验账号：`demo@wozai.local` / `demo123456`（已预置示例记录/天气/纪念日）
-
 ## 📸 预览
 
 | 主页（在一起天数 · 最近记录） | 时间线（季节渐变 · 农历 · 天气） |
