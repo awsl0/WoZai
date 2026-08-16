@@ -1,8 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 访问后端 API / 天气接口 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="wozai_app"
+        android:label="WoZai 我在"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
