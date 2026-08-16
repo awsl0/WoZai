@@ -94,9 +94,8 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
 
   const userContent: unknown[] = [{ type: 'text', text }];
   if (ctx.usePhotos) {
-    // 提速：最多取前 3 张照片参与生成（照片多时其余忽略，避免请求体过大拖慢响应）
-    const photoPaths = ctx.photoPaths.slice(0, 3);
-    for (const p of photoPaths) {
+    // 全部照片参与生成（用户要求，不限制数量）
+    for (const p of ctx.photoPaths) {
       userContent.push({ type: 'image_url', image_url: { url: await fileToDataUrl(p) } });
     }
   }
@@ -117,7 +116,7 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
         { role: 'user', content: userContent },
       ],
       temperature: 0.8,
-      max_tokens: 700,
+      max_tokens: 1024, // 足够 300 字日记 + 推理模型思维链，防截断
     }),
     signal: controller.signal,
   });
