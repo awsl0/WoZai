@@ -10,6 +10,22 @@
 
 客户端为 Flutter（Android / iOS / Web / 桌面），后端为 Node.js + TypeScript + Express + Prisma + SQLite（零数据库依赖，单文件即用）。
 
+## 🚀 在线体验
+
+> 🌐 **https://81.70.172.177:8080** —— 打开即玩，无需安装
+>
+> 体验账号：`demo@wozai.local` / `demo123456`（已预置示例记录/天气/纪念日）
+
+## 📸 预览
+
+| 主页（在一起天数 · 最近记录） | 时间线（季节渐变 · 农历 · 天气） |
+|:---:|:---:|
+| ![主页](docs/screenshots/shot_home.png) | ![时间线](docs/screenshots/shot_timeline.png) |
+
+| 地点线（省→市→景点点亮地图） | 设置（主题/AI 配置/空间/纪念日） |
+|:---:|:---:|
+| ![地点线](docs/screenshots/shot_places.png) | ![设置](docs/screenshots/shot_settings.png) |
+
 ## ✨ 功能
 
 - 📸 **记录事件**：多张照片（≤9 张）+ 自动定位 + 时间（可回填补记）+ 一句话备注

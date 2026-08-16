@@ -11,7 +11,9 @@ class Session {
   static const _kToken = 'token';
   static const _kThemeIndex = 'themeIndex';
 
-  String baseUrl = 'http://localhost:3000';
+  /// 默认后端地址：可用 --dart-define=API_BASE_URL=... 在构建时覆盖（如在线 Demo）
+  String baseUrl = const String.fromEnvironment('API_BASE_URL',
+      defaultValue: 'http://localhost:3000');
   String? token;
   Map<String, dynamic>? user;
   Map<String, dynamic>? space;
