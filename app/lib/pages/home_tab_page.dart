@@ -127,32 +127,32 @@ class _HomeTabPageState extends State<HomeTabPage> {
                             // 有另一半：一大一小两个红心依偎；单人：单个红心
                             if (_partner != null)
                               SizedBox(
-                                width: 38,
-                                height: 30,
+                                width: 30,
+                                height: 24,
                                 child: Stack(
                                   clipBehavior: Clip.none,
                                   children: [
                                     Positioned(
                                       left: 2,
-                                      top: 2,
+                                      top: 1,
                                       child: const Icon(Icons.favorite,
                                           color: Color(0xFFD81B60),
-                                          size: 24),
+                                          size: 20),
                                     ),
                                     Positioned(
-                                      left: 19,
-                                      top: 16,
+                                      left: 16,
+                                      top: 13,
                                       child: const Icon(Icons.favorite,
                                           color: Color(0xFFC2185B),
-                                          size: 14),
+                                          size: 12),
                                     ),
                                   ],
                                 ),
                               )
                             else
                               const Icon(Icons.favorite,
-                                  color: Color(0xFFD81B60), size: 22),
-                            const SizedBox(width: 8),
+                                  color: Color(0xFFD81B60), size: 20),
+                            const SizedBox(width: 6),
                             Flexible(
                               child: Text(
                                 together ??
@@ -160,7 +160,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 18,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w600),
                               ),
                             ),
@@ -183,7 +183,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   // 右侧：有另一半 → 双头像 + 丘比特射爱心；单人 → 只显示自己头像
                   if (_partner != null)
                     Row(
@@ -193,20 +193,20 @@ class _HomeTabPageState extends State<HomeTabPage> {
                         Avatar(
                           avatarPath: me?['avatarPath'] as String?,
                           nickname: me?['nickname'] as String?,
-                          radius: 26,
+                          radius: 20,
                           light: true,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         SizedBox(
-                          width: 46,
-                          height: 52,
+                          width: 42,
+                          height: 46,
                           child: _LoveAnimator(hasPartner: true),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         Avatar(
                           avatarPath: _partner?['user']?['avatarPath'] as String?,
                           nickname: _partner?['user']?['nickname'] as String?,
-                          radius: 26,
+                          radius: 20,
                           light: true,
                         ),
                       ],
@@ -215,7 +215,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
                     Avatar(
                       avatarPath: me?['avatarPath'] as String?,
                       nickname: me?['nickname'] as String?,
-                      radius: 26,
+                      radius: 20,
                       light: true,
                     ),
                 ],
@@ -365,26 +365,26 @@ class _LoveAnimatorState extends State<_LoveAnimator>
             // 丘比特（弓箭）；射向右时镜像
             Transform.flip(
               flipX: !toLeft,
-              child: const Text('🏹', style: TextStyle(fontSize: 20)),
+              child: const Text('🏹', style: TextStyle(fontSize: 18)),
             ),
-            // 有另一半：爱心从中间射向目标侧（弧线 + 淡入淡出）
+            // 有另一半：爱心从中间射向目标侧（在 42px 宽内飞行，不溢出遮挡左侧文字）
             if (widget.hasPartner)
               Positioned(
-                left: toLeft ? 22 - seg * 20 : 22 + seg * 20,
-                top: 6 + math.sin(seg * math.pi * 2) * 5,
+                left: toLeft ? 21 - seg * 13 : 21 + seg * 13,
+                top: 5 + math.sin(seg * math.pi * 2) * 4,
                 child: Opacity(
                   opacity: opacity,
-                  child: const Text('❤️', style: TextStyle(fontSize: 13)),
+                  child: const Text('❤️', style: TextStyle(fontSize: 12)),
                 ),
               ),
             // 无另一半：爱心原地跳动等待
             if (!widget.hasPartner)
               Positioned(
-                left: 17,
-                top: 8 + math.sin(seg * math.pi * 4) * 3,
+                left: 15,
+                top: 7 + math.sin(seg * math.pi * 4) * 3,
                 child: Opacity(
                   opacity: 0.4 + 0.6 * (0.5 + 0.5 * math.sin(seg * math.pi * 2)),
-                  child: const Text('💘', style: TextStyle(fontSize: 13)),
+                  child: const Text('💘', style: TextStyle(fontSize: 12)),
                 ),
               ),
           ],
