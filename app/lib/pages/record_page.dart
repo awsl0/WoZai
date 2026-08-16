@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../api/api_client.dart';
+import '../utils/weather.dart';
 import 'event_page.dart';
 import 'place_picker_page.dart';
 
@@ -49,9 +50,10 @@ class _RecordPageState extends State<RecordPage> {
   Future<void> _pickDateTime() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: _happenedAt,
+      initialDate: _happenedAt.isAfter(DateTime.now()) ? DateTime.now() : _happenedAt,
       firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      // 只能选今天及之前的日期，不允许记录未来的事
+      lastDate: DateTime.now(),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_happenedAt));
@@ -95,13 +97,30 @@ class _RecordPageState extends State<RecordPage> {
   }
 
   Future<void> _save() async {
+    // 防御：即使日期选择器被绕过，也不允许保存未来时间
+    if (_happenedAt.isAfter(DateTime.now())) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('时间不能晚于现在，请重新选择')));
+      return;
+    }
     setState(() => _saving = true);
     try {
+      // 按日期+地点获取当天天气（失败不阻塞记录）
+      Map<String, dynamic>? weather;
+      if (_place?.lat != null && _place?.lng != null) {
+        weather = await fetchWeather(
+          date: _happenedAt,
+          lat: _place!.lat!,
+          lng: _place!.lng!,
+        );
+      }
       final data = await ApiClient.createEvent(
         happenedAt: _happenedAt,
         locationName: _place?.name,
         lat: _place?.lat,
         lng: _place?.lng,
+        weather: weather,
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
         photoBytes: _photos,
       );

@@ -4,23 +4,83 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lunar/lunar.dart';
 
-// ---------- 季度渐变颜色（春绿 夏红 秋黄 冬白，月份间过渡） ----------
-const List<Color> monthColors = [
-  Color(0xFFECEFF1), // 1月 冬白
-  Color(0xFFC5E1A5), // 2月 冬→春
-  Color(0xFF66BB6A), // 3月 春绿
-  Color(0xFF43A047), // 4月 春深绿
-  Color(0xFFAED581), // 5月 春→夏
-  Color(0xFFEF5350), // 6月 夏红
-  Color(0xFFE53935), // 7月 夏深红
-  Color(0xFFFF7043), // 8月 夏→秋
-  Color(0xFFFFC107), // 9月 秋黄
-  Color(0xFFFFB300), // 10月 秋深黄
-  Color(0xFFBCAAA4), // 11月 秋→冬
-  Color(0xFFECEFF1), // 12月 冬白
+// ---------- 季节渐变颜色（春绿 夏红 秋橙 冬冰雪，按月渐进） ----------
+/// 冬季（12-2月）：冰雪蓝白（冰蓝 → 雪白，浅色背景上仍可分辨渐变）
+const List<Color> _winterColors = [
+  Color(0xFF8FC5E3), // 12月 冰蓝
+  Color(0xFFB8DAEE), // 1月 淡冰蓝
+  Color(0xFFE6F2F9), // 2月 雪白（淡蓝底）
+];
+/// 春季（3-5月）：浅绿 → 绿 → 深绿
+const List<Color> _springColors = [
+  Color(0xFFAED581), // 3月 浅绿
+  Color(0xFF66BB6A), // 4月 绿
+  Color(0xFF2E7D32), // 5月 深绿
+];
+/// 夏季（6-8月）：浅红 → 红 → 大红
+const List<Color> _summerColors = [
+  Color(0xFFEF9A9A), // 6月 浅红
+  Color(0xFFEF5350), // 7月 红
+  Color(0xFFB71C1C), // 8月 大红
+];
+/// 秋季（9-11月）：浅橙 → 橙 → 深橙
+const List<Color> _autumnColors = [
+  Color(0xFFFFB74D), // 9月 浅橙
+  Color(0xFFFB8C00), // 10月 橙
+  Color(0xFFE65100), // 11月 深橙
 ];
 
-Color monthColorOf(int month) => monthColors[(month - 1) % 12];
+/// 月份（1-12）归一化
+int _normMonth(int month) => ((month - 1) % 12) + 1;
+
+/// 月份所属季节的渐变色三档（浅 → 深）
+List<Color> _seasonColors(int m) {
+  if (m >= 3 && m <= 5) return _springColors;
+  if (m >= 6 && m <= 8) return _summerColors;
+  if (m >= 9 && m <= 11) return _autumnColors;
+  return _winterColors;
+}
+
+/// 月份在季节内的序号（0/1/2，如 3月/6月/9月/12月 = 0）
+int _seasonIndex(int m) {
+  if (m >= 3 && m <= 5) return m - 3;
+  if (m >= 6 && m <= 8) return m - 6;
+  if (m >= 9 && m <= 11) return m - 9;
+  if (m == 12) return 0;
+  if (m == 1) return 1;
+  return 2; // 2月
+}
+
+/// 某月的季节色（3月浅绿、4月绿、5月深绿…；12月冰蓝、1月淡冰蓝、2月雪白）
+Color monthColorOf(int month) {
+  final m = _normMonth(month);
+  return _seasonColors(m)[_seasonIndex(m)];
+}
+
+/// 某月所属季节的渐变三色（浅 → 深，用于时间线左侧竖线渐变）
+List<Color> timelineGradientOf(int month) => _seasonColors(_normMonth(month));
+
+/// 是否冬季月份（12-2月，冰雪色系用蓝灰文字/描边保证可读）
+bool isWinterMonth(int month) {
+  final m = _normMonth(month);
+  return m == 12 || m == 1 || m == 2;
+}
+
+/// 季节图标（时间线月份节点）：春小草 / 夏太阳 / 秋落叶 / 冬雪花
+String seasonEmojiOf(int month) {
+  final m = _normMonth(month);
+  if (m >= 3 && m <= 5) return '🌱';
+  if (m >= 6 && m <= 8) return '☀️';
+  if (m >= 9 && m <= 11) return '🍂';
+  return '❄️';
+}
+
+/// 可读的季节文字色：非冬季 = 月色调暗 28%（浅色也能看清），冬季 = 冰蓝灰
+Color textColorOf(int month) {
+  final m = _normMonth(month);
+  if (isWinterMonth(m)) return const Color(0xFF52748B);
+  return Color.lerp(_seasonColors(m)[_seasonIndex(m)], Colors.black, 0.28)!;
+}
 
 // ---------- 生肖（按阳历年份） ----------
 const Map<String, String> zodiacEmoji = {
@@ -120,7 +180,8 @@ const List<(int, int, String)> _notableLunar = [
 ];
 
 /// 生成某年的"重要节日 + 纪念日"日期列表（用于无事件日的提示条目）
-List<(DateTime, String)> notableDaysIn(int year, DateTime? startDate) {
+List<(DateTime, String)> notableDaysIn(int year, DateTime? startDate,
+    {List<Map<String, dynamic>> customDates = const []}) {
   final result = <(DateTime, String)>[];
 
   for (final f in _notableSolar) {
@@ -129,6 +190,16 @@ List<(DateTime, String)> notableDaysIn(int year, DateTime? startDate) {
   for (final f in _notableLunar) {
     final solar = Lunar.fromYmd(year, f.$1, f.$2).getSolar();
     result.add((DateTime(solar.getYear(), solar.getMonth(), solar.getDay()), f.$3));
+  }
+
+  // DIY 纪念日（生日/毕业日等，每年提醒）
+  for (final c in customDates) {
+    final m = (c['month'] as num?)?.toInt() ?? 1;
+    final d = (c['day'] as num?)?.toInt() ?? 1;
+    final name = c['name'] as String? ?? '纪念日';
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      result.add((DateTime(year, m, d), name));
+    }
   }
 
   if (startDate != null) {
@@ -168,7 +239,8 @@ class UpcomingDay {
   final int daysLeft;
 }
 
-UpcomingDay? nextUpcoming(DateTime today, DateTime? startDate) {
+UpcomingDay? nextUpcoming(DateTime today, DateTime? startDate,
+    {List<Map<String, dynamic>> customDates = const []}) {
   final today0 = DateTime(today.year, today.month, today.day);
   UpcomingDay? best;
   void consider(String name, DateTime date) {
@@ -180,6 +252,17 @@ UpcomingDay? nextUpcoming(DateTime today, DateTime? startDate) {
     } else if (days < b.daysLeft) {
       best = UpcomingDay(name, date, days);
     }
+  }
+
+  // DIY 纪念日（生日/毕业日等）
+  for (final c in customDates) {
+    final m = (c['month'] as num?)?.toInt() ?? 1;
+    final d = (c['day'] as num?)?.toInt() ?? 1;
+    final name = c['name'] as String? ?? '纪念日';
+    if (m < 1 || m > 12 || d < 1 || d > 31) continue;
+    var date = DateTime(today0.year, m, d);
+    if (date.isBefore(today0)) date = DateTime(today0.year + 1, m, d);
+    consider(name, date);
   }
 
   for (final f in systemFestivals) {

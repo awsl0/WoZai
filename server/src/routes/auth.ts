@@ -1,11 +1,28 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import fs from 'node:fs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { JWT_SECRET, auth } from '../middleware/auth.js';
 
 const router = Router();
+
+// ---- 头像上传（与事件照片共用 uploads/ 目录） ----
+fs.mkdirSync('uploads', { recursive: true });
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: 'uploads/',
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+      cb(null, `avatar-${Date.now()}-${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+});
 
 function signToken(userId: string): string {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '30d' });
@@ -100,6 +117,16 @@ router.put('/profile', auth, async (req, res) => {
   return res.json({ user: { id: user.id, email: user.email, nickname: user.nickname } });
 });
 
+// POST /api/auth/avatar —— 上传/更新自己的头像
+router.post('/avatar', auth, avatarUpload.single('avatar'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '请选择图片文件' });
+  const user = await prisma.user.update({
+    where: { id: req.userId },
+    data: { avatarPath: req.file.filename },
+  });
+  return res.json({ avatarPath: user.avatarPath });
+});
+
 // GET /api/auth/me —— 当前用户 + 所在空间
 router.get('/me', auth, async (req, res) => {
   const user = await prisma.user.findUnique({
@@ -109,7 +136,7 @@ router.get('/me', auth, async (req, res) => {
         include: {
           space: {
             include: {
-              members: { include: { user: { select: { id: true, nickname: true, email: true } } } },
+              members: { include: { user: { select: { id: true, nickname: true, email: true, avatarPath: true } } } },
             },
           },
         },
@@ -126,6 +153,7 @@ router.get('/me', auth, async (req, res) => {
           id: membership.space.id,
           inviteCode: membership.space.inviteCode,
           startDate: membership.space.startDate,
+          customDates: membership.space.customDates ?? [],
           members: membership.space.members.map((m) => ({
             id: m.id,
             role: m.role,

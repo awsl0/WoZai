@@ -76,6 +76,20 @@ class EventCard extends StatelessWidget {
                           style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                     ),
                   ],
+                  // 天气（记录时按日期+地点获取）
+                  if (event['weather'] != null) ...[
+                    const SizedBox(width: 8),
+                    Icon(Icons.wb_sunny_outlined, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 2),
+                    Flexible(
+                      child: Text(
+                        '${event['weather']?['text'] ?? ''}'
+                        '${event['weather']?['temp'] != null ? ' ${event['weather']?['temp']}' : ''}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               // 备注（用户原话）

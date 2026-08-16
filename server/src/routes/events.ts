@@ -49,8 +49,22 @@ router.post('/', upload.array('photos', 9), async (req, res) => {
   if (Number.isNaN(happenedAt.getTime())) {
     return res.status(400).json({ error: 'happenedAt 格式不正确' });
   }
+  // 不允许记录未来时间（容差 5 分钟，应对客户端时钟偏差）
+  if (happenedAt.getTime() > Date.now() + 5 * 60 * 1000) {
+    return res.status(400).json({ error: '事件时间不能晚于当前时间' });
+  }
 
   const files = (req.files as Express.Multer.File[]) ?? [];
+  // 天气（前端按日期+地点调用 Open-Meteo 获取，JSON 字符串）
+  let weather: unknown = null;
+  if (body.weather) {
+    try {
+      const w = JSON.parse(body.weather) as Record<string, unknown>;
+      if (w && typeof w.text === 'string') weather = w as never;
+    } catch {
+      // 天气格式错误则忽略
+    }
+  }
   const event = await prisma.event.create({
     data: {
       spaceId,
@@ -59,6 +73,8 @@ router.post('/', upload.array('photos', 9), async (req, res) => {
       lat: body.lat ? Number(body.lat) : null,
       lng: body.lng ? Number(body.lng) : null,
       locationName: body.locationName || null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      weather: weather as any,
       note: body.note || null,
       photos: { create: files.map((f) => ({ filePath: f.path.replace(/\\/g, '/') })) },
     },
@@ -114,7 +130,16 @@ router.put('/:id', async (req, res) => {
     data.content = parsed.data.content;
     data.editedByUser = true; // 用户编辑过，不再标记为纯 AI 原文
   }
-  if (parsed.data.happenedAt !== undefined) data.happenedAt = new Date(parsed.data.happenedAt);
+  if (parsed.data.happenedAt !== undefined) {
+    const d = new Date(parsed.data.happenedAt);
+    if (Number.isNaN(d.getTime())) {
+      return res.status(400).json({ error: 'happenedAt 格式不正确' });
+    }
+    if (d.getTime() > Date.now() + 5 * 60 * 1000) {
+      return res.status(400).json({ error: '事件时间不能晚于当前时间' });
+    }
+    data.happenedAt = d;
+  }
   if (parsed.data.locationName !== undefined) data.locationName = parsed.data.locationName;
   if (parsed.data.note !== undefined) data.note = parsed.data.note;
   if (parsed.data.lat !== undefined) data.lat = parsed.data.lat;

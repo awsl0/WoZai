@@ -35,8 +35,11 @@ class _HomePageState extends State<HomePage> {
                 await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RecordPage()));
               },
               icon: const Icon(Icons.add_a_photo_outlined),
-              label: const Text('记录此刻'),
+              label: const Text('记录此刻',
+                  style:
+                      TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
               backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
             )
           : null,
       bottomNavigationBar: NavigationBar(

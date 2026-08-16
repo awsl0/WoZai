@@ -39,6 +39,7 @@ class ApiClient {
     double? lng,
     String? locationName,
     String? note,
+    Map<String, dynamic>? weather,
     List<Uint8List> photoBytes = const [],
   }) async {
     final base = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
@@ -53,6 +54,7 @@ class ApiClient {
     if (lng != null) req.fields['lng'] = lng.toString();
     if (locationName != null && locationName.isNotEmpty) req.fields['locationName'] = locationName;
     if (note != null && note.isNotEmpty) req.fields['note'] = note;
+    if (weather != null) req.fields['weather'] = jsonEncode(weather);
     for (var i = 0; i < photoBytes.length; i++) {
       req.files.add(http.MultipartFile.fromBytes('photos', photoBytes[i], filename: 'photo$i.jpg'));
     }
@@ -84,6 +86,30 @@ class ApiClient {
     } catch (_) {
       return null;
     }
+  }
+}
+
+/// 上传头像（multipart：avatar 文件）→ 返回 avatarPath
+Future<String> uploadAvatar(Uint8List bytes, {String filename = 'avatar.jpg'}) async {
+  final base = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
+  final uri = Uri.parse('$base/api/auth/avatar');
+  final req = http.MultipartRequest('POST', uri)
+    ..headers['Authorization'] = 'Bearer ${Session.instance.token}'
+    ..files.add(http.MultipartFile.fromBytes('avatar', bytes, filename: filename));
+  final streamed = await req.send();
+  final res = await http.Response.fromStream(streamed);
+  final decoded = _decodeBody(res.body);
+  if (res.statusCode >= 200 && res.statusCode < 300) {
+    return (decoded?['avatarPath'] as String?) ?? '';
+  }
+  throw ApiException(res.statusCode, decoded?['error']?.toString() ?? '上传失败(${res.statusCode})');
+}
+
+dynamic _decodeBody(String body) {
+  try {
+    return jsonDecode(body);
+  } catch (_) {
+    return null;
   }
 }
 

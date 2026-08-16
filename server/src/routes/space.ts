@@ -20,13 +20,14 @@ router.get('/', async (req, res) => {
 
   const members = await prisma.spaceMember.findMany({
     where: { spaceId: space.id },
-    include: { user: { select: { id: true, email: true, nickname: true } } },
+    include: { user: { select: { id: true, email: true, nickname: true, avatarPath: true } } },
   });
 
   return res.json({
     id: space.id,
     inviteCode: space.inviteCode,
     startDate: space.startDate,
+    customDates: space.customDates ?? [],
     members: members.map((m) => ({ id: m.id, role: m.role, user: m.user })),
   });
 });
@@ -117,6 +118,35 @@ router.put('/start-date', async (req, res) => {
   return res.json({ startDate: updated.startDate });
 });
 
+// PUT /api/space/custom-dates —— 覆盖保存 DIY 纪念日（生日/毕业日等，每年提醒）
+const customDatesSchema = z.object({
+  customDates: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(20),
+        month: z.number().int().min(1).max(12),
+        day: z.number().int().min(1).max(31),
+        // 归属：ownerId = 用户 id（自己的）；null/缺省 = 共同的
+        ownerId: z.string().nullable().optional(),
+      }),
+    )
+    .max(20),
+});
+
+router.put('/custom-dates', async (req, res) => {
+  const parsed = customDatesSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '参数格式不正确' });
+
+  const space = await getMySpace(req.userId!);
+  if (!space) return res.status(404).json({ error: '还没有空间' });
+
+  const updated = await prisma.space.update({
+    where: { id: space.id },
+    data: { customDates: parsed.data.customDates as unknown as object },
+  });
+  return res.json({ customDates: updated.customDates ?? [] });
+});
+
 // POST /api/space/join —— 通过邀请码加入（空间上限 2 人）
 router.post('/join', async (req, res) => {
   const parsed = joinSchema.safeParse(req.body);
@@ -133,6 +163,28 @@ router.post('/join', async (req, res) => {
 
   const alreadyIn = space.members.some((m) => m.userId === req.userId);
   if (alreadyIn) return res.status(409).json({ error: '你已经在空间里了' });
+
+  // 用户注册时自动创建了自己的空间；加入对方空间前，先清理自己的空空间（无事件记录才允许）
+  const mine = await prisma.spaceMember.findMany({
+    where: { userId: req.userId! },
+    include: { space: { include: { events: { select: { id: true } } } } },
+  });
+  for (const m of mine) {
+    if (m.space.events.length > 0) {
+      return res.status(409).json({
+        error: '你已有自己的记录，无法加入对方空间（可先把记录导出备份）',
+      });
+    }
+  }
+  if (mine.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      for (const m of mine) {
+        await tx.spaceMember.deleteMany({ where: { spaceId: m.spaceId } });
+        await tx.aiConfig.deleteMany({ where: { spaceId: m.spaceId } });
+        await tx.space.delete({ where: { id: m.spaceId } });
+      }
+    });
+  }
 
   await prisma.spaceMember.create({
     data: { spaceId: space.id, userId: req.userId!, role: 'member' },

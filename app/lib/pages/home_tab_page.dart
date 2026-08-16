@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
 import '../utils/calendar.dart';
+import '../utils/weather.dart';
+import '../widgets/avatar.dart';
 import '../widgets/event_card.dart';
 import 'event_page.dart';
 
@@ -21,6 +25,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
   List<Map<String, dynamic>> _events = [];
   bool _loading = true;
   String? _error;
+  bool _unauthorized = false; // 401 未登录时显示「去登录」
 
   @override
   void initState() {
@@ -37,6 +42,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
       final data = await ApiClient.request('GET', '/api/events');
       final events = (data['events'] as List).cast<Map<String, dynamic>>();
       final me = await ApiClient.request('GET', '/api/auth/me');
+      Session.instance.user = me['user'] as Map<String, dynamic>?; // 冷启动后刷新用户
       Session.instance.space = me['space'] as Map<String, dynamic>?;
       if (!mounted) return;
       setState(() {
@@ -47,9 +53,20 @@ class _HomeTabPageState extends State<HomeTabPage> {
       if (!mounted) return;
       setState(() {
         _error = e.message;
+        _unauthorized = e.statusCode == 401;
         _loading = false;
       });
     }
+  }
+
+  /// 空间里的另一半（非当前用户）
+  Map<String, dynamic>? get _partner {
+    final members = Session.instance.space?['members'] as List? ?? [];
+    final meId = Session.instance.user?['id'];
+    for (final m in members) {
+      if (m['user']?['id'] != meId) return m as Map<String, dynamic>?;
+    }
+    return null;
   }
 
   @override
@@ -58,9 +75,13 @@ class _HomeTabPageState extends State<HomeTabPage> {
     final primary = theme.colorScheme.primary;
     final space = Session.instance.space;
     final together = togetherText(space);
-    final startDate = DateTime.tryParse((space?['startDate'] as String?) ?? '')?.toLocal();
-    final upcoming = nextUpcoming(DateTime.now(), startDate);
     final me = Session.instance.user;
+    final startDate = DateTime.tryParse((space?['startDate'] as String?) ?? '')?.toLocal();
+    final upcoming = nextUpcoming(DateTime.now(), startDate,
+        customDates: displayCustomDates(
+            (space?['customDates'] as List?) ?? const [],
+            me,
+            space?['members'] as List? ?? const []));
 
     // 统计
     final placeNames = _events
@@ -83,9 +104,9 @@ class _HomeTabPageState extends State<HomeTabPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
-            // 在一起天数大卡片
+            // 在一起天数大卡片：左侧原格式文字 · 右侧双头像 + 丘比特/月老动画
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [primary, primary.withValues(alpha: 0.65)],
@@ -94,33 +115,109 @@ class _HomeTabPageState extends State<HomeTabPage> {
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: Colors.white.withValues(alpha: 0.25),
-                        child: Icon(Icons.favorite, color: Colors.white, size: 22),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        together ?? (me?['nickname'] as String? ?? '我的记录'),
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-                      ),
-                    ],
+                  // 左侧：原格式（爱心 + 在一起 + 纪念日 + 日期）
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            // 有另一半：一大一小两个红心依偎；单人：单个红心
+                            if (_partner != null)
+                              SizedBox(
+                                width: 38,
+                                height: 30,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Positioned(
+                                      left: 2,
+                                      top: 2,
+                                      child: const Icon(Icons.favorite,
+                                          color: Color(0xFFD81B60),
+                                          size: 24),
+                                    ),
+                                    Positioned(
+                                      left: 19,
+                                      top: 16,
+                                      child: const Icon(Icons.favorite,
+                                          color: Color(0xFFC2185B),
+                                          size: 14),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              const Icon(Icons.favorite,
+                                  color: Color(0xFFD81B60), size: 22),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                together ??
+                                    (me?['nickname'] as String? ?? '我的记录'),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          upcoming != null
+                              ? '还有 ${upcoming.daysLeft} 天 · ${upcoming.name}'
+                              : '记录每一天',
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          DateFormat('yyyy年M月d日').format(DateTime.now()),
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    upcoming != null ? '还有 ${upcoming.daysLeft} 天 · ${upcoming.name}' : '记录每一天',
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    DateFormat('yyyy年M月d日').format(DateTime.now()),
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
-                  ),
+                  const SizedBox(width: 12),
+                  // 右侧：有另一半 → 双头像 + 丘比特射爱心；单人 → 只显示自己头像
+                  if (_partner != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Avatar(
+                          avatarPath: me?['avatarPath'] as String?,
+                          nickname: me?['nickname'] as String?,
+                          radius: 26,
+                          light: true,
+                        ),
+                        const SizedBox(width: 4),
+                        SizedBox(
+                          width: 46,
+                          height: 52,
+                          child: _LoveAnimator(hasPartner: true),
+                        ),
+                        const SizedBox(width: 4),
+                        Avatar(
+                          avatarPath: _partner?['user']?['avatarPath'] as String?,
+                          nickname: _partner?['user']?['nickname'] as String?,
+                          radius: 26,
+                          light: true,
+                        ),
+                      ],
+                    )
+                  else
+                    Avatar(
+                      avatarPath: me?['avatarPath'] as String?,
+                      nickname: me?['nickname'] as String?,
+                      radius: 26,
+                      light: true,
+                    ),
                 ],
               ),
             ),
@@ -145,7 +242,17 @@ class _HomeTabPageState extends State<HomeTabPage> {
                   children: [
                     Text(_error!),
                     const SizedBox(height: 8),
-                    FilledButton(onPressed: _refresh, child: const Text('重试')),
+                    if (_unauthorized)
+                      FilledButton(
+                        onPressed: () {
+                          Session.instance.clear();
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                              '/login', (route) => false);
+                        },
+                        child: const Text('去登录'),
+                      )
+                    else
+                      FilledButton(onPressed: _refresh, child: const Text('重试')),
                   ],
                 ),
               ),
@@ -213,6 +320,76 @@ class _StatCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 丘比特往两边射爱心：前 3 秒射向左、后 3 秒射向右，循环
+class _LoveAnimator extends StatefulWidget {
+  const _LoveAnimator({this.hasPartner = true});
+  final bool hasPartner;
+  @override
+  State<_LoveAnimator> createState() => _LoveAnimatorState();
+}
+
+class _LoveAnimatorState extends State<_LoveAnimator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+      vsync: this, duration: const Duration(seconds: 6))
+    ..repeat();
+  late final Animation<double> _t =
+      CurvedAnimation(parent: _ctrl, curve: Curves.linear);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final t = _t.value;
+        final toLeft = t < 0.5; // 前 3 秒射向左、后 3 秒射向右
+        final seg = toLeft ? t / 0.5 : (t - 0.5) / 0.5; // 段内进度 0→1
+        final opacity = seg < 0.12
+            ? seg / 0.12
+            : (seg > 0.88 ? (1 - seg) / 0.12 : 1.0);
+
+        return Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // 丘比特（弓箭）；射向右时镜像
+            Transform.flip(
+              flipX: !toLeft,
+              child: const Text('🏹', style: TextStyle(fontSize: 20)),
+            ),
+            // 有另一半：爱心从中间射向目标侧（弧线 + 淡入淡出）
+            if (widget.hasPartner)
+              Positioned(
+                left: toLeft ? 22 - seg * 20 : 22 + seg * 20,
+                top: 6 + math.sin(seg * math.pi * 2) * 5,
+                child: Opacity(
+                  opacity: opacity,
+                  child: const Text('❤️', style: TextStyle(fontSize: 13)),
+                ),
+              ),
+            // 无另一半：爱心原地跳动等待
+            if (!widget.hasPartner)
+              Positioned(
+                left: 17,
+                top: 8 + math.sin(seg * math.pi * 4) * 3,
+                child: Opacity(
+                  opacity: 0.4 + 0.6 * (0.5 + 0.5 * math.sin(seg * math.pi * 2)),
+                  child: const Text('💘', style: TextStyle(fontSize: 13)),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

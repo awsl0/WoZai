@@ -200,6 +200,17 @@ class _EventPageState extends State<EventPage> {
                   const SizedBox(width: 2),
                   Text(location, style: TextStyle(color: Colors.grey.shade700)),
                 ],
+                // 天气（记录时按日期+地点获取）
+                if (e['weather'] != null) ...[
+                  const SizedBox(width: 12),
+                  Icon(Icons.wb_sunny_outlined, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${e['weather']?['text'] ?? ''}'
+                    '${e['weather']?['temp'] != null ? ' ${e['weather']?['temp']}' : ''}',
+                    style: TextStyle(color: Colors.grey.shade700),
+                  ),
+                ],
               ],
             ),
             if (note != null && note.isNotEmpty) ...[

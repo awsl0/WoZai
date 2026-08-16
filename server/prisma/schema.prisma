@@ -20,15 +20,16 @@ model User {
 }
 
 model Space {
-  id         String        @id @default(cuid())
-  inviteCode String        @unique
-  startDate  DateTime?
-  createdBy  String
-  createdAt  DateTime      @default(now())
-  members    SpaceMember[]
-  events     Event[]
-  aiConfig   AiConfig?
-  owner      User          @relation("CreatedSpaces", fields: [createdBy], references: [id])
+  id          String        @id @default(cuid())
+  inviteCode  String        @unique
+  startDate   DateTime?
+  customDates Json?          // DIY 纪念日：[{ name, month, day }]（生日/毕业日等，每年提醒）
+  createdBy   String
+  createdAt   DateTime      @default(now())
+  members     SpaceMember[]
+  events      Event[]
+  aiConfig    AiConfig?
+  owner       User          @relation("CreatedSpaces", fields: [createdBy], references: [id])
 }
 
 model SpaceMember {
@@ -51,6 +52,7 @@ model Event {
   lat           Float?
   lng           Float?
   locationName  String?
+  weather       Json?    // 当天天气：{ code, text, temp }（记录时按地点获取）
   note          String?
   content       String?
   isAiGenerated Boolean  @default(false)
