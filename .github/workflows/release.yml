@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build release APK
+        run: flutter build apk --release
+      # runner 自带 gh CLI，用 GITHUB_TOKEN 创建 Release 并附 APK
+      - name: 创建 GitHub Release 并附带 APK
+        run: |
+          version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d. -f1-2)
+          apk_name="WoZai-v${version}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "../$apk_name"
+          cd ..
+          gh release create "${{ github.ref_name }}" "$apk_name" --title "WoZai ${{ github.ref_name }}  (v${version})" --generate-notes
