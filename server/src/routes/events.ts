@@ -240,7 +240,13 @@ router.post('/:id/generate', async (req, res) => {
 
   try {
     const content = await generateDiary(
-      { baseUrl: aiConfig.baseUrl, apiKey: aiConfig.apiKey, model: aiConfig.model, style },
+      {
+        baseUrl: aiConfig.baseUrl,
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+        style,
+        maxWaitSeconds: aiConfig.maxWaitSeconds,
+      },
       {
         happenedAt: event.happenedAt,
         locationName: event.locationName,

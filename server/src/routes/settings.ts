@@ -28,6 +28,7 @@ router.get('/ai', async (req, res) => {
       model: cfg.model,
       style: cfg.style,
       styles: (cfg.styles as { name: string; prompt: string }[] | null) ?? [],
+      maxWaitSeconds: cfg.maxWaitSeconds,
       hasApiKey: true,
       apiKeyMasked: maskKey(cfg.apiKey),
     },
@@ -46,6 +47,7 @@ const aiSchema = z.object({
   model: z.string().min(1, '模型名不能为空'),
   style: z.string().max(50).optional(),
   styles: z.array(styleItemSchema).max(10).optional(), // 自定义文风列表
+  maxWaitSeconds: z.number().int().min(30).max(600).optional(), // 最大生成等待时间（秒）30~600
 });
 
 // PUT /api/settings/ai —— 保存 AI 配置（空间级共享）
@@ -73,6 +75,7 @@ router.put('/ai', async (req, res) => {
   if (newKey) data.apiKey = newKey;
   if (parsed.data.style !== undefined) data.style = parsed.data.style;
   if (parsed.data.styles !== undefined) data.styles = parsed.data.styles;
+  if (parsed.data.maxWaitSeconds !== undefined) data.maxWaitSeconds = parsed.data.maxWaitSeconds;
 
   const cfg = await prisma.aiConfig.upsert({
     where: { spaceId },
@@ -84,6 +87,7 @@ router.put('/ai', async (req, res) => {
       model: parsed.data.model,
       style: parsed.data.style ?? '温暖',
       styles: parsed.data.styles,
+      maxWaitSeconds: parsed.data.maxWaitSeconds ?? 240,
     },
     update: data,
   });

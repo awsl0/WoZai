@@ -18,6 +18,8 @@ export interface AiConfigData {
   style: string;
   /** 自定义文风列表 [{ name, prompt }] */
   styles?: { name: string; prompt: string }[];
+  /** 最大生成等待时间（秒），默认 240 */
+  maxWaitSeconds?: number;
 }
 
 export interface GenerateContext {
@@ -102,8 +104,10 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
 
   const baseUrl = cfg.baseUrl.replace(/\/+$/, '');
   const controller = new AbortController();
-  // 超时随照片数增长：1 张≈80s，9 张≈240s（图片多 + 备注长时推理模型耗时显著增加）
-  const timeoutMs = 60_000 + ctx.photoPaths.length * 20_000;
+  // 动态超时（按照片数）+ 用户设置的最大等待时间上限（默认 240s）
+  const dynamicTimeoutMs = 60_000 + ctx.photoPaths.length * 20_000;
+  const maxWaitMs = (cfg.maxWaitSeconds ?? 240) * 1000;
+  const timeoutMs = Math.min(dynamicTimeoutMs, maxWaitMs);
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',

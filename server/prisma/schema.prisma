@@ -73,13 +73,14 @@ model Photo {
 }
 
 model AiConfig {
-  id        String   @id @default(cuid())
-  spaceId   String   @unique
-  baseUrl   String
-  apiKey    String
-  model     String
-  style     String   @default("温暖") // 默认文风名（生成时可临时切换）
-  styles    Json?    // 自定义文风列表 [{ name, prompt }]
-  updatedAt DateTime @updatedAt
-  space     Space    @relation(fields: [spaceId], references: [id])
+  id             String   @id @default(cuid())
+  spaceId        String   @unique
+  baseUrl        String
+  apiKey         String
+  model          String
+  style          String   @default("温暖") // 默认文风名（生成时可临时切换）
+  styles         Json?    // 自定义文风列表 [{ name, prompt }]
+  maxWaitSeconds Int      @default(240) // AI 生成最大等待时间（秒）
+  updatedAt      DateTime @updatedAt
+  space          Space    @relation(fields: [spaceId], references: [id])
 }

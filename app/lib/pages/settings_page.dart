@@ -22,6 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final _aiBaseUrlCtrl = TextEditingController();
   final _aiKeyCtrl = TextEditingController();
   final _aiModelCtrl = TextEditingController();
+  final _aiMaxWaitCtrl = TextEditingController(text: '240');
   final _newStyleNameCtrl = TextEditingController();
   final _newStylePromptCtrl = TextEditingController();
   List<Map<String, dynamic>> _customStyles = [];
@@ -68,6 +69,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _aiBaseUrlCtrl.dispose();
     _aiKeyCtrl.dispose();
     _aiModelCtrl.dispose();
+    _aiMaxWaitCtrl.dispose();
     _newStyleNameCtrl.dispose();
     _newStylePromptCtrl.dispose();
     super.dispose();
@@ -82,6 +84,7 @@ class _SettingsPageState extends State<SettingsPage> {
         if (cfg != null) {
           _aiBaseUrlCtrl.text = cfg['baseUrl'] as String? ?? '';
           _aiModelCtrl.text = cfg['model'] as String? ?? '';
+          _aiMaxWaitCtrl.text = (cfg['maxWaitSeconds'] as int? ?? 240).toString();
           _customStyles = (cfg['styles'] as List? ?? []).cast<Map<String, dynamic>>();
           // 已保存的 key 只显示掩码提示，不填入输入框（避免保存时把脱敏值写回覆盖真 key）
           _savedKeyMasked = (cfg['hasApiKey'] == true) ? (cfg['apiKeyMasked'] as String? ?? '') : null;
@@ -127,6 +130,7 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_aiKeyTouched) 'apiKey': _aiKeyCtrl.text.trim(),
         'model': _aiModelCtrl.text.trim(),
         'styles': _customStyles,
+        'maxWaitSeconds': int.tryParse(_aiMaxWaitCtrl.text.trim()) ?? 240,
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AI 配置已保存')));
@@ -547,6 +551,15 @@ class _SettingsPageState extends State<SettingsPage> {
         TextField(
           controller: _aiModelCtrl,
           decoration: const InputDecoration(labelText: '模型', hintText: 'qwen-vl-max'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _aiMaxWaitCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: '最大生成等待时间（秒）',
+            helperText: '超过该时间未返回则报错重试，默认 240',
+          ),
         ),
         const SizedBox(height: 12),
         Row(
