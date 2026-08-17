@@ -102,7 +102,9 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
 
   const baseUrl = cfg.baseUrl.replace(/\/+$/, '');
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90000); // 90s 超时保护
+  // 超时随照片数增长：1 张≈80s，9 张≈240s（图片多 + 备注长时推理模型耗时显著增加）
+  const timeoutMs = 60_000 + ctx.photoPaths.length * 20_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
