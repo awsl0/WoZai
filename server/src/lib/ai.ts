@@ -116,8 +116,7 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
         { role: 'user', content: userContent },
       ],
       temperature: 0.8,
-      // 推理模型思维链很长，1024 会被思维链吃满导致正文被截断，提到 2048
-      max_tokens: 2048,
+      // 不限制输出长度：图片多/含标题描述时内容较长，交给模型自由输出，90s 超时兜底
     }),
     signal: controller.signal,
   });
