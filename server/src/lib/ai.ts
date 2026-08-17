@@ -116,7 +116,8 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
         { role: 'user', content: userContent },
       ],
       temperature: 0.8,
-      max_tokens: 1024, // 足够 300 字日记 + 推理模型思维链，防截断
+      // 推理模型思维链很长，1024 会被思维链吃满导致正文被截断，提到 2048
+      max_tokens: 2048,
     }),
     signal: controller.signal,
   });
@@ -131,15 +132,27 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
     throw new Error(`AI 请求失败 (${res.status}): ${body.slice(0, 300)}`);
   }
 
-  let data: { choices?: { message?: { content?: string } }[] };
+  let data: {
+    choices?: { message?: { content?: string; reasoning_content?: string }; finish_reason?: string }[];
+  };
   try {
-    data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    data = (await res.json()) as typeof data;
   } catch (e) {
     throw new Error('AI 返回内容无法解析');
   }
-  const content = data.choices?.[0]?.message?.content?.trim();
+  const choice = data.choices?.[0];
+  const content = choice?.message?.content?.trim();
   if (!content) {
+    const reasoning = (choice?.message?.reasoning_content ?? '').trim();
     const raw = JSON.stringify(data).slice(0, 200);
+    if (choice?.finish_reason === 'length') {
+      // 输出 token 被截断：通常因为推理模型思考过长，正文还没开始就被截断
+      throw new Error(
+        reasoning
+          ? 'AI 思考过长导致输出被截断，请换用非推理模型（如 qwen3-plus 类）或减少照片数量后重试'
+          : 'AI 输出被截断（超出长度限制），请重试或换一个模型',
+      );
+    }
     throw new Error(`AI 返回内容为空（可能被截断或模型不支持该请求）：${raw}`);
   }
   return content;
