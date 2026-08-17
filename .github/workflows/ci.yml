@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: # 手动触发：发版时构建 APK 并自动更新仓库安装包
+
+permissions:
+  contents: write
 
 jobs:
   server:
@@ -46,3 +50,46 @@ jobs:
         run: flutter analyze
       - name: Test
         run: flutter test
+
+  # 构建 Android APK（免费托管，不占本地空间）
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+      - name: Install dependencies
+        run: flutter pub get
+      - name: 固定签名密钥（与本地 debug key 一致，保证覆盖安装不失效）
+        run: |
+          mkdir -p ~/.android
+          cp android/debug.keystore ~/.android/debug.keystore
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: 上传 APK 产物（Actions 页面可下载）
+        uses: actions/upload-artifact@v4
+        with:
+          name: wozai-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: 更新仓库内 APK 安装包（WoZai-vX.Y.apk）
+        run: |
+          version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d. -f1-2)
+          apk_name="WoZai-v${version}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk ../"$apk_name"
+          cd ..
+          git config user.name "WoZai CI"
+          git config user.email "ywjsn552566@163.com"
+          git add "$apk_name"
+          if ! git diff --cached --quiet; then
+            git commit -m "build: 自动更新 $apk_name [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "APK 无变化，跳过提交"
+          fi

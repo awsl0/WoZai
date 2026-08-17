@@ -98,18 +98,14 @@ flutter build apk --release
 
 > ⚠️ 本地数据（`server/.env`、`server/prisma/dev.db`、`server/uploads/`）不随仓库同步，新环境需重新注册账号、重新配置 AI。如需迁移数据，用旧环境「设置 → 导出全部数据」或直接拷贝上述文件。
 
-### 本地构建 Android APK
+### Android APK 构建（走 GitHub Actions，无需本地 Android 环境）
 
-```bash
-# 前提：JDK 17+（本机 C:\Program Files\Java\latest\jdk-21）
-# Android SDK（本机 E:/android-sdk，已装 platform 35/36 + build-tools 35/36 + platform-tools）
-# 注意：Windows PATH 里 x86 javapath 是 Java8，已在 sdkmanager.bat 强制 JAVA_HOME=JDK21
+`push main` 或手动触发 Actions 的 **CI → apk job** 会自动：
+1. 云端构建 `flutter build apk --release`
+2. 产物上传 Actions artifact（可下载）
+3. 自动更新仓库根目录 `WoZai-vX.Y.apk`（版本号从 `app/pubspec.yaml` 提取）并提交回 main
 
-export ANDROID_HOME=E:/android-sdk
-export JAVA_HOME="C:/Program Files/Java/latest/jdk-21"
-cd app && flutter build apk --release
-# 产物：build/app/outputs/flutter-apk/app-release.apk → 覆盖仓库根 WoZai-vX.Y.apk 后提交
-```
+安装包永远在仓库根目录（如 `WoZai-v1.2.apk`），手机直接下载安装。
 
 ## ☁️ 部署（轻量云，生产）
 
