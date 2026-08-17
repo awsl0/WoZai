@@ -229,10 +229,11 @@ router.post('/:id/generate', async (req, res) => {
 
   const parsed = generateSchema.safeParse(req.body ?? {});
   const style = parsed.success && parsed.data.style ? parsed.data.style : aiConfig.style;
-  const usePhotos = parsed.success ? (parsed.data.usePhotos ?? true) : true;
+  let usePhotos = parsed.success ? (parsed.data.usePhotos ?? true) : true;
 
-  if (usePhotos && event.photos.length === 0) {
-    return res.status(400).json({ error: '这个事件没有照片，无法看图生成（可请求时传 usePhotos:false 用纯文本模式）' });
+  // 没照片时自动降级纯文本（不报错，UI 也不显示开关）
+  if (event.photos.length === 0) {
+    usePhotos = false;
   }
 
   const memberCount = await prisma.spaceMember.count({ where: { spaceId: event.spaceId } });

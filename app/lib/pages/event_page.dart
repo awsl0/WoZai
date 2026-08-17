@@ -66,8 +66,11 @@ class _EventPageState extends State<EventPage> {
   Future<void> _generate() async {
     setState(() => _generating = true);
     try {
+      // 无照片时自动走纯文本模式（不显示开关，也不报错）
+      final photos = (_event?['photos'] as List?) ?? [];
+      final usePhotos = photos.isNotEmpty ? _usePhotos : false;
       final data = await ApiClient.request('POST', '/api/events/${widget.eventId}/generate',
-          body: {'style': _style, 'usePhotos': _usePhotos});
+          body: {'style': _style, 'usePhotos': usePhotos});
       if (!mounted) return;
       setState(() {
         _event = data['event'] as Map<String, dynamic>;
