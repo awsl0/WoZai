@@ -23,8 +23,10 @@ jobs:
         run: flutter pub get
       - name: Build release APK
         run: flutter build apk --release
-      # runner 自带 gh CLI，用 GITHUB_TOKEN 创建 Release 并附 APK
+      # runner 自带 gh CLI，注入 GH_TOKEN 创建 Release 并附 APK
       - name: 创建 GitHub Release 并附带 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d. -f1-2)
           apk_name="WoZai-v${version}.apk"

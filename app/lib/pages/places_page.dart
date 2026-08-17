@@ -687,7 +687,7 @@ class _GlowMarkerState extends State<_GlowMarker>
                     child: count > 1
                         ? Center(
                             child: Text(
-                              '${count}',
+                              '$count',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,

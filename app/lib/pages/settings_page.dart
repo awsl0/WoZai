@@ -817,9 +817,8 @@ class _SettingsPageState extends State<SettingsPage> {
         OutlinedButton(
           onPressed: () async {
             await Session.instance.saveBaseUrl(_baseUrlCtrl.text.trim());
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('后端地址已保存')));
-            }
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('后端地址已保存')));
           },
           child: const Text('保存后端地址'),
         ),
