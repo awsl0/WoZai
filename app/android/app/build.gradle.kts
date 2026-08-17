@@ -34,7 +34,7 @@ android {
             // 统一签名：使用仓库内的 app/android/debug.keystore（本地与 CI 同一把 key，保证覆盖安装）
             // 密码/别名可用环境变量覆盖，默认 android/androiddebugkey
             signingConfig = signingConfigs.create("wozai") {
-                storeFile = file("debug.keystore")
+                storeFile = file("../debug.keystore")
                 storePassword = System.getenv("WOZAI_KEYSTORE_PASS") ?: "android"
                 keyAlias = System.getenv("WOZAI_KEY_ALIAS") ?: "androiddebugkey"
                 keyPassword = System.getenv("WOZAI_KEY_PASS") ?: "android"
