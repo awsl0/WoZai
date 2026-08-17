@@ -31,9 +31,17 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 统一签名：使用仓库内的 app/android/debug.keystore（本地与 CI 同一把 key，保证覆盖安装）
+            // 密码/别名可用环境变量覆盖，默认 android/androiddebugkey
+            signingConfig = signingConfigs.create("wozai") {
+                storeFile = file("debug.keystore")
+                storePassword = System.getenv("WOZAI_KEYSTORE_PASS") ?: "android"
+                keyAlias = System.getenv("WOZAI_KEY_ALIAS") ?: "androiddebugkey"
+                keyPassword = System.getenv("WOZAI_KEY_PASS") ?: "android"
+                // 开启 v1 签名，兼容 Android 7.0 以下设备（否则会报"包已损坏/解析失败"）
+                enableV1Signing = true
+                enableV2Signing = true
+            }
         }
     }
 }

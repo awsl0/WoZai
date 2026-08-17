@@ -67,10 +67,6 @@ jobs:
           flutter-version: 3.47.0
       - name: Install dependencies
         run: flutter pub get
-      - name: 固定签名密钥（与本地 debug key 一致，保证覆盖安装不失效）
-        run: |
-          mkdir -p ~/.android
-          cp android/debug.keystore ~/.android/debug.keystore
       - name: Build release APK
         run: flutter build apk --release
       - name: 上传 APK 产物（Actions 页面可下载）
