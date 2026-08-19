@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../api/api_client.dart';
+import '../utils/geolocate.dart';
 import '../utils/weather.dart';
 import 'event_page.dart';
 import 'place_picker_page.dart';
@@ -21,8 +22,26 @@ class _RecordPageState extends State<RecordPage> {
 
   DateTime _happenedAt = DateTime.now();
   PlaceResult? _place;
+  /// 是否正在自动定位
+  bool _locating = true;
   final _noteCtrl = TextEditingController();
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoLocate();
+  }
+
+  /// 打开记录页自动定位当前位置（失败不阻塞，可手动选择）
+  Future<void> _autoLocate() async {
+    final result = await locateCurrent();
+    if (!mounted) return;
+    setState(() {
+      if (result != null) _place = result;
+      _locating = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -223,30 +242,50 @@ class _RecordPageState extends State<RecordPage> {
               ),
               trailing: TextButton(onPressed: _pickDateTime, child: const Text('修改')),
             ),
-            // 地点
+            // 地点（打开页面自动定位，可重新定位/地图选点/手动输入）
             Card(
               margin: EdgeInsets.zero,
               child: ListTile(
-                leading: Icon(Icons.place_outlined,
-                    color: _place != null ? Theme.of(context).colorScheme.primary : null),
+                leading: _locating
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(Icons.place_outlined,
+                        color: _place != null ? Theme.of(context).colorScheme.primary : null),
                 title: Text(
-                  _place != null ? _place!.name : '地点（可选）',
+                  _locating
+                      ? '正在定位当前位置…'
+                      : (_place != null ? _place!.name : '地点（可选）'),
                   style: TextStyle(
-                    color: _place != null ? null : Colors.grey.shade600,
-                    fontWeight: _place != null ? FontWeight.w600 : null,
+                    color: _place != null && !_locating ? null : Colors.grey.shade600,
+                    fontWeight: _place != null && !_locating ? FontWeight.w600 : null,
                   ),
                 ),
-                subtitle: _place != null && _place!.lat != null
-                    ? Text(
-                        '${_place!.lat!.toStringAsFixed(4)}, ${_place!.lng!.toStringAsFixed(4)} · 地图定位',
-                        style: const TextStyle(fontSize: 11),
-                      )
-                    : _place != null
-                        ? const Text('手动填写', style: TextStyle(fontSize: 11))
-                        : null,
+                subtitle: _locating
+                    ? const Text('调用手机定位，稍等几秒', style: TextStyle(fontSize: 11))
+                    : _place != null && _place!.lat != null
+                        ? Text(
+                            '${_place!.lat!.toStringAsFixed(4)}, ${_place!.lng!.toStringAsFixed(4)} · 自动定位',
+                            style: const TextStyle(fontSize: 11),
+                          )
+                        : _place != null
+                            ? const Text('手动填写', style: TextStyle(fontSize: 11))
+                            : const Text('定位失败或未授权，可手动选择',
+                                style: TextStyle(fontSize: 11)),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_place != null && !_locating)
+                      IconButton(
+                        icon: const Icon(Icons.my_location, size: 18),
+                        onPressed: () {
+                          setState(() => _locating = true);
+                          _autoLocate();
+                        },
+                        tooltip: '重新定位',
+                      ),
                     if (_place != null)
                       IconButton(
                         icon: const Icon(Icons.close, size: 18),
