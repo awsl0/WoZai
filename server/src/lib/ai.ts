@@ -31,6 +31,18 @@ export interface GenerateContext {
   usePhotos: boolean;
   /** couple = 双人空间(用"我们")；solo = 单人空间(用"我") */
   perspective: 'couple' | 'solo';
+  /** 同空间最近的历史事件摘要（AI 的记忆上下文），按时间倒序 */
+  recentEvents?: RecentEventSummary[];
+}
+
+/** 历史事件摘要：供 AI 参考的"记忆" */
+export interface RecentEventSummary {
+  /** 距离天数："3 天前" */
+  daysAgo: string;
+  happenedAt: Date;
+  locationName: string | null;
+  note: string | null;
+  content: string | null;
 }
 
 function formatTime(d: Date): string {
@@ -43,6 +55,22 @@ async function fileToDataUrl(filePath: string): Promise<string> {
   const ext = path.extname(filePath).toLowerCase();
   const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
   return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
+/**
+ * 把最近历史事件整理成供 AI 阅读的"记忆"文本。
+ * 控制总量：最多 8 条，正文摘要截断到 100 字符，避免输入过长。
+ */
+function buildMemoryText(recentEvents?: RecentEventSummary[]): string {
+  const list = (recentEvents ?? []).slice(0, 8);
+  if (list.length === 0) return '';
+  const lines = list.map((e) => {
+    const loc = e.locationName ?? '未知地点';
+    const note = e.note && e.note.trim() ? `备注：${e.note.trim().slice(0, 60)}` : '';
+    const content = e.content && e.content.trim() ? e.content.trim().replace(/\s+/g, ' ').slice(0, 100) : '';
+    return `- ${e.daysAgo}（${formatTime(e.happenedAt)} · ${loc}）${note ? ' ' + note : ''}${content ? ' 记载：' + content + '…' : ''}`;
+  });
+  return `【最近记录（你的记忆）】\n${lines.join('\n')}\n（请参考以上记忆，写出有延续感的日记；禁止引用记忆中没有的信息）`;
 }
 
 /**
@@ -69,11 +97,16 @@ function resolveSystemPrompt(style: string, styles: AiConfigData['styles'], pron
     '4. 时间或地点缺失时直接跳过，不得自行补充或猜测。',
     '5. 用户没有备注时写 80~150 字；有备注时围绕备注扩写 150~300 字。',
     '',
-    '【形式规则】',
-    `6. 用第一人称"${pronoun}"，全文人称保持一致。`,
-    '7. 直接输出日记正文：不要输出"时间：""地点："等前缀，不要用 markdown 符号、列表、编号或分段标题。',
+    '【记忆关联】',
+    '6. 用户会提供最近的历史记录作为“记忆”。如果本次事件与记忆有关联（同一地点、节日/纪念日、前几天刚发生过的事、两个人惯常的习惯），要在日记里自然体现这种延续与意义（如“又是这里”“上次来还是那天”“这是我们的第N次”）。',
+    '7. 引用记忆时必须真实存在；禁止编造记忆里没有的事（如记忆里没提过的餐厅名、日期、人物、事件）。',
+    '8. 记忆只是背景，正文主体仍以本次照片、时间、地点、备注为准；若本次与记忆无关或记忆为空，正常记录本次即可，不要强行关联。',
     '',
-    `【文风】8. ${rule}`,
+    '【形式规则】',
+    `9. 用第一人称"${pronoun}"，全文人称保持一致。`,
+    '10. 直接输出日记正文：不要输出“时间：”“地点：”等前缀，不要用 markdown 符号、列表、编号或分段标题。',
+    '',
+    `【文风】11. ${rule}`,
   ].join('\n');
 }
 
@@ -94,7 +127,11 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
       : '（本次没有提供照片：请仅根据时间、地点和备注描述情景，不要编造具体画面）',
   ].join('\n');
 
-  const userContent: unknown[] = [{ type: 'text', text }];
+  // 记忆上下文：同空间最近的历史记录（AI 据此写出有关联、有意义的日记）
+  const memoryText = buildMemoryText(ctx.recentEvents);
+  const promptParts = [text, memoryText].filter((s) => s.length > 0).join('\n\n');
+
+  const userContent: unknown[] = [{ type: 'text', text: promptParts }];
   if (ctx.usePhotos) {
     // 全部照片参与生成（用户要求，不限制数量）
     for (const p of ctx.photoPaths) {

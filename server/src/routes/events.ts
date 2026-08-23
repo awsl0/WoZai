@@ -238,6 +238,26 @@ router.post('/:id/generate', async (req, res) => {
 
   const memberCount = await prisma.spaceMember.count({ where: { spaceId: event.spaceId } });
 
+  // 记忆上下文：同空间最近 10 条事件（AI 据此写出有关联、有延续感的日记）
+  const history = await prisma.event.findMany({
+    where: { spaceId: event.spaceId, id: { not: event.id } },
+    orderBy: { happenedAt: 'desc' },
+    take: 10,
+    select: { happenedAt: true, locationName: true, note: true, content: true },
+  });
+  const daysAgo = (d: Date): string => {
+    const diff = Date.now() - d.getTime();
+    const days = Math.max(0, Math.floor(diff / 86_400_000));
+    return days === 0 ? '今天' : days === 1 ? '昨天' : `${days} 天前`;
+  };
+  const recentEvents = history.map((h) => ({
+    daysAgo: daysAgo(h.happenedAt),
+    happenedAt: h.happenedAt,
+    locationName: h.locationName,
+    note: h.note,
+    content: h.content,
+  }));
+
   try {
     const content = await generateDiary(
       {
@@ -254,6 +274,7 @@ router.post('/:id/generate', async (req, res) => {
         photoPaths: usePhotos ? event.photos.map((p) => p.filePath) : [],
         usePhotos,
         perspective: memberCount > 1 ? 'couple' : 'solo',
+        recentEvents,
       },
     );
 
