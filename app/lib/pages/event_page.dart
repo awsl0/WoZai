@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../state/session.dart';
 import '../constants/ai_styles.dart';
 import 'event_edit_page.dart';
+import 'photo_viewer_page.dart';
 
 /// 事件详情页：照片 + 时间/地点 + 备注 + AI 生成/重新生成 + 编辑正文 + 删除
 class EventPage extends StatefulWidget {
@@ -161,6 +162,10 @@ class _EventPageState extends State<EventPage> {
     final location = e['locationName'] as String?;
     final note = e['note'] as String?;
     final baseUrl = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final photoUrls = [
+      for (final p in photos)
+        '$baseUrl/uploads/${(p['filePath'] as String).split('/').last}',
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -185,15 +190,29 @@ class _EventPageState extends State<EventPage> {
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, i) {
                     final path = (photos[i]['filePath'] as String?) ?? '';
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        '$baseUrl/uploads/${path.split('/').last}',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          width: 220,
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PhotoViewerPage(
+                                urls: photoUrls, initialIndex: i),
+                          ),
+                        );
+                      },
+                      child: Hero(
+                        tag: 'photo-${photoUrls[i]}',
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            '$baseUrl/uploads/${path.split('/').last}',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              width: 220,
+                              color: Colors.grey.shade200,
+                              child: const Icon(Icons.broken_image,
+                                  color: Colors.grey),
+                            ),
+                          ),
                         ),
                       ),
                     );

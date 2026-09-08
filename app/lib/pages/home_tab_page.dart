@@ -9,6 +9,8 @@ import '../utils/weather.dart';
 import '../widgets/avatar.dart';
 import '../widgets/event_card.dart';
 import 'event_page.dart';
+import 'places_page.dart';
+import 'photo_gallery_page.dart';
 
 /// 主页：在一起天数 + 下一个纪念日 + 统计 + 最近记录
 class HomeTabPage extends StatefulWidget {
@@ -88,7 +90,20 @@ class _HomeTabPageState extends State<HomeTabPage> {
         .map((e) => e['locationName'] as String?)
         .where((n) => n != null && n.isNotEmpty)
         .toSet();
-    final photoCount = _events.fold<int>(0, (sum, e) => sum + ((e['photos'] as List?)?.length ?? 0));
+    final photoCount = _events.fold<int>(
+        0, (sum, e) => sum + ((e['photos'] as List?)?.length ?? 0));
+    // 所有照片（带所属事件上下文，供照片墙展示/放大）
+    final allPhotos = <Map<String, dynamic>>[
+      for (final e in _events)
+        for (final p in (e['photos'] as List?) ?? [])
+          {
+            ...(p as Map<String, dynamic>),
+            'eventId': e['id'],
+            'happenedAt': e['happenedAt'],
+            'locationName': e['locationName'],
+            'note': e['note'],
+          },
+    ];
     final recent = _events.take(3).toList();
 
     return Scaffold(
@@ -231,11 +246,32 @@ class _HomeTabPageState extends State<HomeTabPage> {
             // 统计
             Row(
               children: [
-                _StatCard(icon: Icons.event_note, value: '${_events.length}', label: '记录'),
+                _StatCard(
+                  icon: Icons.event_note,
+                  value: '${_events.length}',
+                  label: '记录 · 点击查看全部',
+                  onTap: widget.onViewAll,
+                ),
                 const SizedBox(width: 10),
-                _StatCard(icon: Icons.place_outlined, value: '${placeNames.length}', label: '去过的地方'),
+                _StatCard(
+                  icon: Icons.place_outlined,
+                  value: '${placeNames.length}',
+                  label: '去过的地方',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PlacesPage()),
+                  ),
+                ),
                 const SizedBox(width: 10),
-                _StatCard(icon: Icons.photo_outlined, value: '$photoCount', label: '照片'),
+                _StatCard(
+                  icon: Icons.photo_outlined,
+                  value: '$photoCount',
+                  label: '照片',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PhotoGalleryPage(photos: allPhotos),
+                    ),
+                  ),
+                ),
               ],
             ),
             if (_loading && _events.isEmpty) ...[
@@ -302,28 +338,40 @@ class _HomeTabPageState extends State<HomeTabPage> {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.icon, required this.value, required this.label});
+  const _StatCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+    this.onTap,
+  });
   final IconData icon;
   final String value;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: primary, size: 20),
-            const SizedBox(height: 6),
-            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-          ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: primary, size: 20),
+              const SizedBox(height: 6),
+              Text(value,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(label,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            ],
+          ),
         ),
       ),
     );
