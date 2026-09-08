@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../api/api_client.dart';
 import '../utils/city_coords.dart';
@@ -101,40 +99,28 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
     _debounce = Timer(const Duration(milliseconds: 350), () => _searchSuggestions(text));
   }
 
-  /// 候选搜索：Photon 在线地理编码（覆盖县城/街道等全量 OSM 地名）
+  /// 候选搜索：优先走自家后端地理编码代理（手机必可达）；失败再降级本地城市库
   Future<void> _searchSuggestions(String q) async {
     setState(() => _searching = true);
     try {
-      final uri = Uri.parse(
-          'https://photon.komoot.io/api/?q=${Uri.encodeQueryComponent(q)}&limit=8');
-      final res = await http.get(uri).timeout(const Duration(seconds: 8));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final features = (data['features'] as List?) ?? [];
-        final list = <_SearchResult>[];
-        for (final f in features.take(8)) {
-          final m = f as Map<String, dynamic>;
-          final props = (m['properties'] as Map<String, dynamic>?) ?? {};
-          final coord = (((m['geometry'] as Map<String, dynamic>?) ?? {})
-                  ['coordinates'] as List?)
-              ?.cast<num>();
-          if (coord == null || coord.length < 2) continue;
-          final name = (props['name'] as String?)?.trim() ?? q;
-          final addr = _formatAddr(props);
-          list.add(_SearchResult(
-              name: name,
-              address: addr,
-              lat: coord[1].toDouble(),
-              lng: coord[0].toDouble()));
-        }
-        if (!mounted) return;
-        setState(() {
-          _results = list;
-          _showResults = true;
-          _searching = false;
-        });
-        return;
-      }
+      final data = await ApiClient.request(
+          'GET', '/api/geocode?q=${Uri.encodeQueryComponent(q)}');
+      final list = (data['results'] as List).cast<Map<String, dynamic>>();
+      if (!mounted) return;
+      setState(() {
+        _results = [
+          for (final r in list)
+            _SearchResult(
+              name: (r['name'] as String?) ?? q,
+              address: (r['address'] as String?) ?? '',
+              lat: (r['lat'] as num).toDouble(),
+              lng: (r['lng'] as num).toDouble(),
+            ),
+        ];
+        _showResults = true;
+        _searching = false;
+      });
+      return;
     } catch (_) {}
     // 离线兜底：城市库/景点库（网络不可用时仍可定位大城市）
     if (!mounted) return;
@@ -155,17 +141,6 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
       _showResults = true;
       _searching = false;
     });
-  }
-
-  /// 候选展示地址：country/state/city/county/district/street 逐级拼接（去重，重名也能区分）
-  String _formatAddr(Map<String, dynamic> props) {
-    final seen = <String>{};
-    final parts = <String>[];
-    for (final k in ['country', 'state', 'city', 'county', 'district', 'locality', 'street']) {
-      final v = (props[k] as String?)?.trim() ?? '';
-      if (v.isNotEmpty && v != '中国' && seen.add(v)) parts.add(v);
-    }
-    return parts.join(' ');
   }
 
   /// 回车：直接选中第一个候选（没有候选则用本地城市库/景点库）
