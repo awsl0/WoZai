@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,20 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../api/api_client.dart';
 import '../utils/city_coords.dart';
+
+/// 搜索结果：名称 + 分层地址 + 坐标（高德式候选）
+class _SearchResult {
+  const _SearchResult({
+    required this.name,
+    required this.address,
+    required this.lat,
+    required this.lng,
+  });
+  final String name;
+  final String address;
+  final double lat;
+  final double lng;
+}
 
 /// 选中的地点结果
 class PlaceResult {
@@ -29,9 +44,13 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
   String? _pickedCity;
   final TextEditingController _searchCtrl = TextEditingController();
   bool _searching = false;
+  Timer? _debounce;
+  List<_SearchResult> _results = [];
+  bool _showResults = false;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -67,54 +86,131 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
     }
   }
 
-  /// 搜索定位：命中后自动选中该位置（可直接确认使用）
-  Future<void> _search() async {
-    final q = _searchCtrl.text.trim();
-    if (q.isEmpty || _searching) return;
+  /// 输入变化：防抖后拉候选列表
+  void _onSearchChanged(String q) {
+    _debounce?.cancel();
+    final text = q.trim();
+    if (text.isEmpty) {
+      setState(() {
+        _showResults = false;
+        _results = [];
+        _searching = false;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 350), () => _searchSuggestions(text));
+  }
+
+  /// 候选搜索：Photon 在线地理编码（覆盖县城/街道等全量 OSM 地名）
+  Future<void> _searchSuggestions(String q) async {
     setState(() => _searching = true);
     try {
-      // 1) 景点库
+      final uri = Uri.parse(
+          'https://photon.komoot.io/api/?q=${Uri.encodeQueryComponent(q)}&limit=8');
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final features = (data['features'] as List?) ?? [];
+        final list = <_SearchResult>[];
+        for (final f in features.take(8)) {
+          final m = f as Map<String, dynamic>;
+          final props = (m['properties'] as Map<String, dynamic>?) ?? {};
+          final coord = (((m['geometry'] as Map<String, dynamic>?) ?? {})
+                  ['coordinates'] as List?)
+              ?.cast<num>();
+          if (coord == null || coord.length < 2) continue;
+          final name = (props['name'] as String?)?.trim() ?? q;
+          final addr = _formatAddr(props);
+          list.add(_SearchResult(
+              name: name,
+              address: addr,
+              lat: coord[1].toDouble(),
+              lng: coord[0].toDouble()));
+        }
+        if (!mounted) return;
+        setState(() {
+          _results = list;
+          _showResults = true;
+          _searching = false;
+        });
+        return;
+      }
+    } catch (_) {}
+    // 离线兜底：城市库/景点库（网络不可用时仍可定位大城市）
+    if (!mounted) return;
+    final spot = matchSpot(q);
+    final city = matchCity(q);
+    setState(() {
+      if (spot != null) {
+        _results = [
+          _SearchResult(name: spot.$1, address: '${spot.$2} · ${spot.$3}', lat: spot.$4, lng: spot.$5),
+        ];
+      } else if (city != null) {
+        _results = [
+          _SearchResult(name: city.$2, address: city.$1, lat: city.$3, lng: city.$4),
+        ];
+      } else {
+        _results = [];
+      }
+      _showResults = true;
+      _searching = false;
+    });
+  }
+
+  /// 候选展示地址：country/state/city/county/district/street 逐级拼接（去重，重名也能区分）
+  String _formatAddr(Map<String, dynamic> props) {
+    final seen = <String>{};
+    final parts = <String>[];
+    for (final k in ['country', 'state', 'city', 'county', 'district', 'locality', 'street']) {
+      final v = (props[k] as String?)?.trim() ?? '';
+      if (v.isNotEmpty && v != '中国' && seen.add(v)) parts.add(v);
+    }
+    return parts.join(' ');
+  }
+
+  /// 回车：直接选中第一个候选（没有候选则用本地城市库/景点库）
+  Future<void> _searchSubmit() async {
+    final q = _searchCtrl.text.trim();
+    if (q.isEmpty || _searching) return;
+    if (_results.isNotEmpty) {
+      _selectResult(_results.first);
+      return;
+    }
+    setState(() => _searching = true);
+    try {
       final spot = matchSpot(q);
       if (spot != null) {
         _applySearch(spot.$1, LatLng(spot.$4, spot.$5), 13);
         return;
       }
-      // 2) 全国城市库
       final city = matchCity(q);
       if (city != null) {
         _applySearch(city.$2, LatLng(city.$3, city.$4), 10);
         return;
       }
-      // 3) Photon 在线地理编码
-      final uri = Uri.parse(
-          'https://photon.komoot.io/api/?q=${Uri.encodeQueryComponent(q)}&limit=1&lang=zh');
-      final res = await http.get(uri).timeout(const Duration(seconds: 10));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final features = (data['features'] as List?) ?? [];
-        if (features.isNotEmpty) {
-          final f = features.first as Map<String, dynamic>;
-          final coord =
-              (((f['geometry'] as Map<String, dynamic>)['coordinates']) as List)
-                  .cast<num>();
-          if (coord.length >= 2) {
-            final name =
-                ((f['properties'] as Map<String, dynamic>?)?['name']) ?? q;
-            _applySearch(name, LatLng(coord[1].toDouble(), coord[0].toDouble()), 12);
-            return;
-          }
-        }
-      }
-      _toast('未找到「$q」，试试输入城市名（如 郑州 / 北京）');
-    } catch (_) {
-      _toast('搜索失败，请检查网络后重试');
+      _toast('未找到「$q」，试试输入更完整的地名');
     } finally {
       if (mounted) setState(() => _searching = false);
     }
   }
 
+  void _selectResult(_SearchResult r) {
+    _searchCtrl.text = r.name;
+    _searchCtrl.selection = TextSelection.collapsed(offset: r.name.length);
+    setState(() {
+      _showResults = false;
+      _picked = LatLng(r.lat, r.lng);
+      _pickedCity = r.name;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mapController.move(LatLng(r.lat, r.lng), 12);
+    });
+    _toast('已选择：${r.name}${r.address.isEmpty ? '' : '（${r.address}）'}');
+  }
+
   void _applySearch(String name, LatLng p, double zoom) {
     setState(() {
+      _showResults = false;
       _picked = p;
       _pickedCity = name;
     });
@@ -209,41 +305,87 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
                     ),
                 ],
               ),
-              // 搜索定位框（输入城市/景点名直接定位并选中）
+              // 搜索定位框（输入地名显示候选列表，点击选中定位）
               Positioned(
                 top: 12,
                 left: 12,
                 right: 12,
-                child: TextField(
-                  controller: _searchCtrl,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => _search(),
-                  decoration: InputDecoration(
-                    hintText: '搜索城市/景点定位，如 郑州',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _searching
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2)),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.near_me_outlined, size: 20),
-                            tooltip: '定位搜索',
-                            onPressed: _search,
-                          ),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.94),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _searchCtrl,
+                      textInputAction: TextInputAction.search,
+                      onChanged: _onSearchChanged,
+                      onSubmitted: (_) => _searchSubmit(),
+                      decoration: InputDecoration(
+                        hintText: '搜索地名，如 周口 / 太康县',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _searching
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2)),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.near_me_outlined, size: 20),
+                                tooltip: '定位搜索',
+                                onPressed: _searchSubmit,
+                              ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.94),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      ),
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                  ),
+                    // 候选列表（高德式）：显示名称 + 分省/市/县地址
+                    if (_showResults && _results.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 8),
+                          ],
+                        ),
+                        constraints: const BoxConstraints(maxHeight: 250),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: _results.length,
+                          separatorBuilder: (_, _) => Divider(
+                              height: 1, color: Colors.grey.shade200),
+                          itemBuilder: (context, i) {
+                            final r = _results[i];
+                            return ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.place_outlined,
+                                  size: 18, color: Colors.grey),
+                              title: Text(r.name,
+                                  style: const TextStyle(fontSize: 14)),
+                              subtitle: r.address.isEmpty
+                                  ? null
+                                  : Text(r.address,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600)),
+                              onTap: () => _selectResult(r),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
               // 提示

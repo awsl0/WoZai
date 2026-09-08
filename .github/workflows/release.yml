@@ -23,13 +23,19 @@ jobs:
         run: flutter pub get
       - name: Build release APK
         run: flutter build apk --release
-      # runner 自带 gh CLI，注入 GH_TOKEN 创建 Release 并附 APK
-      - name: 创建 GitHub Release 并附带 APK
+      # runner 自带 gh CLI，注入 GH_TOKEN 创建/更新 Release 并附 APK（幂等：已存在则覆盖资产）
+      - name: 创建或更新 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d. -f1-2)
           apk_name="WoZai-v${version}.apk"
+          ref="${{ github.ref_name }}"
           cp build/app/outputs/flutter-apk/app-release.apk "../$apk_name"
           cd ..
-          gh release create "${{ github.ref_name }}" "$apk_name" --title "WoZai ${{ github.ref_name }}  (v${version})" --generate-notes
+          if gh release view "$ref" --json id >/dev/null 2>&1; then
+            echo "Release $ref 已存在，覆盖 APK 资产"
+            gh release upload "$ref" "$apk_name" --clobber
+          else
+            gh release create "$ref" "$apk_name" --title "WoZai $ref (v${version})" --generate-notes
+          fi
