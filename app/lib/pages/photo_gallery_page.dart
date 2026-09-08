@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../state/session.dart';
+import '../utils/photo_url.dart';
 import 'photo_viewer_page.dart';
 
 /// 照片墙：展示所有记录里的照片（网格），点击放大查看
@@ -14,12 +15,12 @@ class PhotoGalleryPage extends StatefulWidget {
 }
 
 class _PhotoGalleryPageState extends State<PhotoGalleryPage> {
-  late List<String> _urls = _buildUrls();
+  late final List<String> _urls = _buildUrls();
 
   List<String> _buildUrls() {
     final baseUrl = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
     return widget.photos
-        .map((p) => '$baseUrl/uploads/${(p['filePath'] as String).split('/').last}')
+        .map((p) => photoUrl(baseUrl, (p['filePath'] as String? ?? '')))
         .toList();
   }
 
@@ -58,9 +59,31 @@ class _PhotoGalleryPageState extends State<PhotoGalleryPage> {
                         Image.network(
                           url,
                           fit: BoxFit.cover,
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null
+                                  ? child
+                                  : Container(
+                                      color: Colors.grey.shade200,
+                                      child: const Center(
+                                          child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2))),
+                                    ),
                           errorBuilder: (_, _, _) => Container(
                             color: Colors.grey.shade200,
-                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.broken_image,
+                                    color: Colors.grey, size: 28),
+                                SizedBox(height: 2),
+                                Text('加载失败',
+                                    style: TextStyle(
+                                        color: Colors.grey, fontSize: 10)),
+                              ],
+                            ),
                           ),
                         ),
                         // 左下角：所属事件的日期/地点

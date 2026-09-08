@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 
@@ -123,7 +124,12 @@ router.post('/ai/test', async (req, res) => {
     const timer = setTimeout(() => controller.abort(), 20000);
     const r = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        // opencode.ai 网关要求每次会话带唯一 header，否则 400 MissingSessionID
+        'x-opencode-session': randomUUID(),
+      },
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: '请只回复两个字：正常' }],

@@ -5,6 +5,7 @@ import '../state/session.dart';
 import '../constants/ai_styles.dart';
 import 'event_edit_page.dart';
 import 'photo_viewer_page.dart';
+import '../utils/photo_url.dart';
 
 /// 事件详情页：照片 + 时间/地点 + 备注 + AI 生成/重新生成 + 编辑正文 + 删除
 class EventPage extends StatefulWidget {
@@ -163,8 +164,7 @@ class _EventPageState extends State<EventPage> {
     final note = e['note'] as String?;
     final baseUrl = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
     final photoUrls = [
-      for (final p in photos)
-        '$baseUrl/uploads/${(p['filePath'] as String).split('/').last}',
+      for (final p in photos) photoUrl(baseUrl, p['filePath'] as String? ?? ''),
     ];
 
     return Scaffold(
@@ -189,7 +189,6 @@ class _EventPageState extends State<EventPage> {
                   itemCount: photos.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, i) {
-                    final path = (photos[i]['filePath'] as String?) ?? '';
                     return GestureDetector(
                       onTap: () {
                         Navigator.of(context).push(
@@ -204,7 +203,7 @@ class _EventPageState extends State<EventPage> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Image.network(
-                            '$baseUrl/uploads/${path.split('/').last}',
+                            photoUrls[i],
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => Container(
                               width: 220,

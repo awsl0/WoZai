@@ -46,27 +46,9 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
                   child: Center(
                     child: Hero(
                       tag: 'photo-${widget.urls[i]}',
-                      child: Image.network(
-                        widget.urls[i],
-                        fit: BoxFit.contain,
-                        loadingBuilder: (_, child, progress) =>
-                            progress == null
-                                ? child
-                                : const Center(
-                                    child: CircularProgressIndicator(
-                                        color: Colors.white70)),
-                        errorBuilder: (_, _, _) => const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.broken_image,
-                                  color: Colors.white54, size: 48),
-                              SizedBox(height: 8),
-                              Text('图片加载失败',
-                                  style: TextStyle(color: Colors.white54)),
-                            ],
-                          ),
-                        ),
+                      child: PhotoViewerImage(
+                        key: ValueKey('pv-${widget.urls[i]}'),
+                        url: widget.urls[i],
                       ),
                     ),
                   ),
@@ -94,6 +76,60 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 网络图：加载中转圈，失败提示可点击重试
+class PhotoViewerImage extends StatefulWidget {
+  const PhotoViewerImage({super.key, required this.url});
+  final String url;
+  @override
+  State<PhotoViewerImage> createState() => _PhotoViewerImageState();
+}
+
+class _PhotoViewerImageState extends State<PhotoViewerImage> {
+  bool _failed = false;
+  int _tick = 0;
+
+  @override
+  void didUpdateWidget(covariant PhotoViewerImage old) {
+    super.didUpdateWidget(old);
+    if (old.url != widget.url) {
+      _failed = false;
+      _tick++;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _failed
+          ? () => setState(() {
+                _failed = false;
+                _tick++;
+              })
+          : null,
+      child: Image.network(
+        widget.url,
+        fit: BoxFit.contain,
+        key: ValueKey('img-$_tick'),
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : const Center(
+                child: CircularProgressIndicator(color: Colors.white70)),
+        errorBuilder: (_, _, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.broken_image, color: Colors.white54, size: 48),
+              const SizedBox(height: 8),
+              const Text('图片加载失败，点击重试',
+                  style: TextStyle(color: Colors.white54, fontSize: 13)),
+            ],
+          ),
+        ),
       ),
     );
   }

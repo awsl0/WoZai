@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../state/session.dart';
+import '../utils/photo_url.dart';
 
 /// 时间线事件卡片：照片墙 + 正文 + 时间/地点 + 作者
 class EventCard extends StatelessWidget {
@@ -42,7 +43,7 @@ class EventCard extends StatelessWidget {
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          '$baseUrl/uploads/${path.split('/').last}',
+                          photoUrl(baseUrl, path),
                           width: 160,
                           height: 160,
                           fit: BoxFit.cover,

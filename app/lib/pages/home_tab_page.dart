@@ -249,7 +249,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
                 _StatCard(
                   icon: Icons.event_note,
                   value: '${_events.length}',
-                  label: '记录 · 点击查看全部',
+                  label: '记录',
                   onTap: widget.onViewAll,
                 ),
                 const SizedBox(width: 10),

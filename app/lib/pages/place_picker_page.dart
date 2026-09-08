@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../api/api_client.dart';
 import '../utils/city_coords.dart';
@@ -24,6 +27,14 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
   final MapController _mapController = MapController();
   LatLng? _picked;
   String? _pickedCity;
+  final TextEditingController _searchCtrl = TextEditingController();
+  bool _searching = false;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   List<String> _historyPlaces = [];
   bool _loadingHistory = true;
@@ -54,6 +65,70 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
       if (!mounted) return;
       setState(() => _loadingHistory = false);
     }
+  }
+
+  /// 搜索定位：命中后自动选中该位置（可直接确认使用）
+  Future<void> _search() async {
+    final q = _searchCtrl.text.trim();
+    if (q.isEmpty || _searching) return;
+    setState(() => _searching = true);
+    try {
+      // 1) 景点库
+      final spot = matchSpot(q);
+      if (spot != null) {
+        _applySearch(spot.$1, LatLng(spot.$4, spot.$5), 13);
+        return;
+      }
+      // 2) 全国城市库
+      final city = matchCity(q);
+      if (city != null) {
+        _applySearch(city.$2, LatLng(city.$3, city.$4), 10);
+        return;
+      }
+      // 3) Photon 在线地理编码
+      final uri = Uri.parse(
+          'https://photon.komoot.io/api/?q=${Uri.encodeQueryComponent(q)}&limit=1&lang=zh');
+      final res = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final features = (data['features'] as List?) ?? [];
+        if (features.isNotEmpty) {
+          final f = features.first as Map<String, dynamic>;
+          final coord =
+              (((f['geometry'] as Map<String, dynamic>)['coordinates']) as List)
+                  .cast<num>();
+          if (coord.length >= 2) {
+            final name =
+                ((f['properties'] as Map<String, dynamic>?)?['name']) ?? q;
+            _applySearch(name, LatLng(coord[1].toDouble(), coord[0].toDouble()), 12);
+            return;
+          }
+        }
+      }
+      _toast('未找到「$q」，试试输入城市名（如 郑州 / 北京）');
+    } catch (_) {
+      _toast('搜索失败，请检查网络后重试');
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  void _applySearch(String name, LatLng p, double zoom) {
+    setState(() {
+      _picked = p;
+      _pickedCity = name;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mapController.move(p, zoom);
+    });
+    _toast('已定位：$name');
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
   }
 
   void _onMapTap(TapPosition tapPosition, LatLng latlng) {
@@ -134,9 +209,46 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
                     ),
                 ],
               ),
-              // 提示
+              // 搜索定位框（输入城市/景点名直接定位并选中）
               Positioned(
                 top: 12,
+                left: 12,
+                right: 12,
+                child: TextField(
+                  controller: _searchCtrl,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _search(),
+                  decoration: InputDecoration(
+                    hintText: '搜索城市/景点定位，如 郑州',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searching
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.near_me_outlined, size: 20),
+                            tooltip: '定位搜索',
+                            onPressed: _search,
+                          ),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.94),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  ),
+                ),
+              ),
+              // 提示
+              Positioned(
+                top: 72,
                 left: 0,
                 right: 0,
                 child: Center(
