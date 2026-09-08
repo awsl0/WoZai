@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 /** 内置文风：名字 → 文风要求（幻觉约束规则在统一模板里带上） */
 export const PRESET_STYLES: Record<string, string> = {
@@ -151,6 +152,8 @@ export async function generateDiary(cfg: AiConfigData, ctx: GenerateContext): Pr
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${cfg.apiKey}`,
+      // opencode.ai 网关要求每次会话带唯一 header，否则 400 MissingSessionID
+      'x-opencode-session': randomUUID(),
     },
     body: JSON.stringify({
       model: cfg.model,

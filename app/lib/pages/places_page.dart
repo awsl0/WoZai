@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
@@ -63,6 +66,14 @@ class _PlacesPageState extends State<PlacesPage> {
   String? _error;
   bool _listMode = false;
   final MapController _mapController = MapController();
+  final TextEditingController _searchCtrl = TextEditingController();
+  bool _searching = false;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   /// 层级切换阈值：zoom < 6 省 / 6-9 市 / ≥9 景点
   static const double _cityZoomThreshold = 6.0;
@@ -169,6 +180,67 @@ class _PlacesPageState extends State<PlacesPage> {
     );
   }
 
+  /// 搜索定位：城市库优先（本地离线）；未命中再走 Photon 在线地理编码
+  Future<void> _search() async {
+    final q = _searchCtrl.text.trim();
+    if (q.isEmpty || _searching) return;
+    if (mounted) setState(() => _searching = true);
+    try {
+      // 1) 景点库精确匹配
+      final spot = matchSpot(q);
+      if (spot != null) {
+        _goTo(LatLng(spot.$4, spot.$5), 12, '已定位：${spot.$1}');
+        return;
+      }
+      // 2) 全国城市库匹配（含市名如“郑州”）
+      final city = matchCity(q);
+      if (city != null) {
+        _goTo(LatLng(city.$3, city.$4), 9, '已定位：${city.$2}（${city.$1}）');
+        return;
+      }
+      // 3) Photon 在线地理编码（国内可达，免 key）
+      final uri = Uri.parse(
+          'https://photon.komoot.io/api/?q=${Uri.encodeQueryComponent(q)}&limit=1&lang=zh');
+      final res = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final features = (data['features'] as List?) ?? [];
+        if (features.isNotEmpty) {
+          final f = features.first as Map<String, dynamic>;
+          final coord =
+              (((f['geometry'] as Map<String, dynamic>)['coordinates']) as List)
+                  .cast<num>();
+          if (coord.length >= 2) {
+            final name = ((f['properties'] as Map<String, dynamic>?)?['name']) ?? q;
+            _goTo(LatLng(coord[1].toDouble(), coord[0].toDouble()), 12, '已定位：$name');
+            return;
+          }
+        }
+      }
+      _snack('未找到「$q」，试试输入城市名（如 郑州 / 北京）');
+    } catch (_) {
+      _snack('搜索失败，请检查网络后重试');
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  void _goTo(LatLng p, double zoom, String msg) {
+    setState(() => _listMode = false);
+    // 等一帧让地图可见后再移动
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mapController.move(p, zoom);
+    });
+    _snack(msg);
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
+  }
+
   /// 地图位置变化：根据缩放级别自动切换 省/市/景点 三级
   void _onPositionChanged(MapCamera camera, bool hasGesture) {
     final level = camera.zoom >= _spotZoomThreshold
@@ -235,7 +307,48 @@ class _PlacesPageState extends State<PlacesPage> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh, tooltip: '刷新'),
         ],
       ),
-      body: _loading && _events.isEmpty
+      body: Column(
+        children: [
+          // 搜索定位框：输入城市/景点名直接定位
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: TextField(
+              controller: _searchCtrl,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _search(),
+              decoration: InputDecoration(
+                hintText: '输入城市/景点名定位，如 郑州',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searching
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.near_me_outlined, size: 20),
+                        tooltip: '定位',
+                        onPressed: _search,
+                      ),
+                isDense: true,
+                filled: true,
+                fillColor: Theme.of(context)
+                    .colorScheme
+                    .surface
+                    .withValues(alpha: 0.6),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _loading && _events.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : _error != null && _events.isEmpty
               ? Center(
@@ -271,6 +384,9 @@ class _PlacesPageState extends State<PlacesPage> {
               : _listMode
                   ? _buildList(primary)
                   : _buildMap(primary),
+          ),
+        ],
+      ),
     );
   }
 
