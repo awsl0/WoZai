@@ -111,47 +111,95 @@ class _PlacesPageState extends State<PlacesPage> {
       return (0, 0);
     }
 
+    _CityAgg ensureCity(String prov, String city, double clat, double clng) =>
+        cityMap.putIfAbsent('$prov|$city', () => _CityAgg(prov, city, clat, clng));
+
+    _ProvAgg ensureProv(String prov, double lat, double lng) =>
+        provMap.putIfAbsent(prov, () {
+          final c = provinceCenters[prov] ?? (lat, lng);
+          return _ProvAgg(prov, c.$1, c.$2);
+        });
+
+    void attach(_CityAgg ca, _ProvAgg pa, Map<String, dynamic> e) {
+      ca.events.add(e);
+      pa.events.add(e);
+      if (!pa.cities.contains(ca)) pa.cities.add(ca);
+    }
+
     for (final e in _events) {
       final place = (e['locationName'] as String?)?.trim() ?? '';
-      if (place.isEmpty) continue;
+      final lat = (e['lat'] as num?)?.toDouble();
+      final lng = (e['lng'] as num?)?.toDouble();
+      if (place.isEmpty && lat == null) continue;
 
-      // 1) 先匹配景点/区县（更细一级）
+      // 归属省/市：有坐标优先（用最近内置城市判定归属）；否则靠地点名匹配城市库
+      String? prov, city;
+      double clat = 0, clng = 0;
+      if (lat != null && lng != null) {
+        final nc = _nearestCityInfo(lat, lng);
+        if (nc == null) continue;
+        prov = nc.$1;
+        city = nc.$2;
+        clat = nc.$3;
+        clng = nc.$4;
+      } else {
+        final m = matchCity(place);
+        if (m == null) continue;
+        prov = m.$1;
+        city = m.$2;
+        clat = m.$3;
+        clng = m.$4;
+      }
+
+      // 1) 内置景点（精确坐标，最高优先级）
       final spot = matchSpot(place);
       if (spot != null) {
-        final sa = spotMap.putIfAbsent(spot.$1,
-            () => _SpotAgg(spot.$1, spot.$2, spot.$3, spot.$4, spot.$5));
+        final sa = spotMap.putIfAbsent(
+            spot.$1, () => _SpotAgg(spot.$1, spot.$2, spot.$3, spot.$4, spot.$5));
         sa.events.add(e);
         final cc = cityCoord(spot.$2);
-        final ca = cityMap.putIfAbsent(
-            '${spot.$3}|${spot.$2}', () => _CityAgg(spot.$3, spot.$2, cc.$1, cc.$2));
-        ca.events.add(e);
+        final ca = ensureCity(spot.$3, spot.$2, cc.$1, cc.$2);
         if (!ca.spots.contains(sa)) ca.spots.add(sa);
-        final pa = provMap.putIfAbsent(spot.$3, () {
-          final c = provinceCenters[spot.$3] ?? (cc.$1, cc.$2);
-          return _ProvAgg(spot.$3, c.$1, c.$2);
-        });
-        pa.events.add(e);
-        if (!pa.cities.contains(ca)) pa.cities.add(ca);
+        final pa = ensureProv(spot.$3, spot.$4, spot.$5);
+        attach(ca, pa, e);
         continue;
       }
 
-      // 2) 否则匹配城市
-      final m = matchCity(place);
-      if (m == null) continue;
-      final key = '${m.$1}|${m.$2}';
-      final agg = cityMap.putIfAbsent(
-          key, () => _CityAgg(m.$1, m.$2, m.$3, m.$4));
-      agg.events.add(e);
-      final pa = provMap.putIfAbsent(m.$1, () {
-        final c = provinceCenters[m.$1] ?? (m.$3, m.$4);
-        return _ProvAgg(m.$1, c.$1, c.$2);
-      });
-      pa.events.add(e);
-      if (!pa.cities.contains(agg)) pa.cities.add(agg);
+      // 2) 有真实坐标的普通地点：按坐标精确点显示（地点线就能看到任意新地点）
+      if (lat != null && lng != null && place.isNotEmpty) {
+        final sa = spotMap.putIfAbsent('$place|$lat|$lng',
+            () => _SpotAgg(place, city!, prov!, lat, lng));
+        sa.events.add(e);
+        final ca = ensureCity(prov, city, clat, clng);
+        if (!ca.spots.contains(sa)) ca.spots.add(sa);
+        final pa = ensureProv(prov, clat, clng);
+        attach(ca, pa, e);
+        continue;
+      }
+
+      // 3) 只有地点名（匹配到内置城市库）
+      final ca3 = ensureCity(prov, city, clat, clng);
+      final pa3 = ensureProv(prov, clat, clng);
+      attach(ca3, pa3, e);
     }
+
     _aggs = cityMap.values.toList()..sort((a, b) => b.count.compareTo(a.count));
     _spotAggs = spotMap.values.toList()..sort((a, b) => b.count.compareTo(a.count));
     _provAggs = provMap.values.toList()..sort((a, b) => b.count.compareTo(a.count));
+  }
+
+  /// 最近内置城市（不限距离）→ (省, 城市, 纬度, 经度)
+  (String, String, double, double)? _nearestCityInfo(double lat, double lng) {
+    (String, String, double, double)? best;
+    var bestD = double.infinity;
+    for (final c in cityCoords) {
+      final d = distanceKm(lat, lng, c.$3, c.$4);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best;
   }
 
   /// 点击城市点：放大到城市 + 弹出回忆面板

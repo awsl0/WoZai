@@ -15,6 +15,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _tab = 0;
+  int _placesTick = 0; // 切到地点线时 +1，强制 PlacesPage 重建刷新新记录
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +26,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           HomeTabPage(onViewAll: () => setState(() => _tab = 1)),
           const TimelinePage(),
-          const PlacesPage(),
+          PlacesPage(key: ValueKey('places-$_placesTick')),
           const SettingsPage(),
         ],
       ),
@@ -44,7 +45,10 @@ class _HomePageState extends State<HomePage> {
           : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        onDestinationSelected: (i) {
+          if (i == 2) _placesTick++;
+          setState(() => _tab = i);
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '主页'),
           NavigationDestination(icon: Icon(Icons.timeline), label: '时间线'),
