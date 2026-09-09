@@ -236,6 +236,21 @@ String nearestCity(double lat, double lng) {
   }
   return bestD < 300 ? best : '未知位置'; // 300km 内才认
 }
+
+/// 最近内置城市（不限距离）→ (省, 城市, 纬度, 经度)。
+/// 用于有真实坐标的事件归到省/市（与地点线口径一致）。
+(String, String, double, double)? nearestCityInfo(double lat, double lng) {
+  (String, String, double, double)? best;
+  var bestD = double.infinity;
+  for (final c in cityCoords) {
+    final d = distanceKm(lat, lng, c.$3, c.$4);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best;
+}
 /// 细粒度地点表（著名景点/区县）：(地点名, 所属城市, 所属省, 纬度, 经度)
 /// 用于比城市更细一级的点亮（记录地点匹配到景点时显示到具体位置）
 const List<(String, String, String, double, double)> spotCoords = [

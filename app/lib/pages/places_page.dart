@@ -136,7 +136,7 @@ class _PlacesPageState extends State<PlacesPage> {
       String? prov, city;
       double clat = 0, clng = 0;
       if (lat != null && lng != null) {
-        final nc = _nearestCityInfo(lat, lng);
+        final nc = nearestCityInfo(lat, lng);
         if (nc == null) continue;
         prov = nc.$1;
         city = nc.$2;
@@ -186,20 +186,6 @@ class _PlacesPageState extends State<PlacesPage> {
     _aggs = cityMap.values.toList()..sort((a, b) => b.count.compareTo(a.count));
     _spotAggs = spotMap.values.toList()..sort((a, b) => b.count.compareTo(a.count));
     _provAggs = provMap.values.toList()..sort((a, b) => b.count.compareTo(a.count));
-  }
-
-  /// 最近内置城市（不限距离）→ (省, 城市, 纬度, 经度)
-  (String, String, double, double)? _nearestCityInfo(double lat, double lng) {
-    (String, String, double, double)? best;
-    var bestD = double.infinity;
-    for (final c in cityCoords) {
-      final d = distanceKm(lat, lng, c.$3, c.$4);
-      if (d < bestD) {
-        bestD = d;
-        best = c;
-      }
-    }
-    return best;
   }
 
   /// 点击城市点：放大到城市 + 弹出回忆面板

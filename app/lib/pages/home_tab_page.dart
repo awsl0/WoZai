@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
 import '../utils/calendar.dart';
+import '../utils/city_coords.dart';
 import '../utils/weather.dart';
 import '../widgets/avatar.dart';
 import '../widgets/event_card.dart';
@@ -86,10 +87,12 @@ class _HomeTabPageState extends State<HomeTabPage> {
             space?['members'] as List? ?? const []));
 
     // 统计
-    final placeNames = _events
-        .map((e) => e['locationName'] as String?)
-        .where((n) => n != null && n.isNotEmpty)
-        .toSet();
+    // 「去过的地方」与地点线同一口径：按事件真实坐标/地点名归到城市，去重城市数
+    final visitedCity = <String>{
+      for (final e in _events)
+        if (_cityKeyOf(e) != null) _cityKeyOf(e)!,
+    };
+    final placeCount = visitedCity.length;
     final photoCount = _events.fold<int>(
         0, (sum, e) => sum + ((e['photos'] as List?)?.length ?? 0));
     // 所有照片（带所属事件上下文，供照片墙展示/放大）
@@ -255,7 +258,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
                 const SizedBox(width: 10),
                 _StatCard(
                   icon: Icons.place_outlined,
-                  value: '${placeNames.length}',
+                  value: '$placeCount',
                   label: '去过的地方',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const PlacesPage()),
@@ -327,6 +330,21 @@ class _HomeTabPageState extends State<HomeTabPage> {
         ),
       ),
     );
+  }
+
+  /// 事件归到城市键（省|市），与地点线聚合口径一致；无坐标且匹配不上返回 null
+  String? _cityKeyOf(Map<String, dynamic> e) {
+    final place = (e['locationName'] as String?)?.trim() ?? '';
+    final lat = (e['lat'] as num?)?.toDouble();
+    final lng = (e['lng'] as num?)?.toDouble();
+    if (lat != null && lng != null) {
+      final nc = nearestCityInfo(lat, lng);
+      if (nc != null) return '${nc.$1}|${nc.$2}';
+      return null;
+    }
+    final m = matchCity(place);
+    if (m != null) return '${m.$1}|${m.$2}';
+    return null;
   }
 
   void _openEvent(Map<String, dynamic> event) async {

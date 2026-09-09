@@ -238,9 +238,13 @@ router.post('/:id/generate', async (req, res) => {
 
   const memberCount = await prisma.spaceMember.count({ where: { spaceId: event.spaceId } });
 
-  // 记忆上下文：同空间最近 10 条事件（AI 据此写出有关联、有延续感的日记）
+  // 记忆上下文：该事件发生“之前”的同空间最近 10 条事件（AI 只参考过去，不参考后来发生的事）
   const history = await prisma.event.findMany({
-    where: { spaceId: event.spaceId, id: { not: event.id } },
+    where: {
+      spaceId: event.spaceId,
+      id: { not: event.id },
+      happenedAt: { lt: event.happenedAt },
+    },
     orderBy: { happenedAt: 'desc' },
     take: 10,
     select: { happenedAt: true, locationName: true, note: true, content: true },
