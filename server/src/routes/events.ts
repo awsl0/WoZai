@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { generateDiary } from '../lib/ai.js';
+import { geocodeQuery } from './geocode.js';
 
 const router = Router();
 
@@ -65,13 +66,27 @@ router.post('/', upload.array('photos', 9), async (req, res) => {
       // 天气格式错误则忽略
     }
   }
+  // 自动补坐标：手动输入地点无坐标时，后端查 geocode 补一个（地点线/统计才能点亮）
+  let lat: number | null = body.lat ? Number(body.lat) : null;
+  let lng: number | null = body.lng ? Number(body.lng) : null;
+  if ((lat == null || lng == null) && body.locationName?.trim()) {
+    try {
+      const r = await geocodeQuery(body.locationName.trim());
+      if (r.length > 0) {
+        lat = r[0].lat;
+        lng = r[0].lng;
+      }
+    } catch {
+      // 补坐标失败不阻塞创建
+    }
+  }
   const event = await prisma.event.create({
     data: {
       spaceId,
       authorId: req.userId!,
       happenedAt,
-      lat: body.lat ? Number(body.lat) : null,
-      lng: body.lng ? Number(body.lng) : null,
+      lat,
+      lng,
       locationName: body.locationName || null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       weather: weather as any,
@@ -144,8 +159,20 @@ router.put('/:id', async (req, res) => {
   }
   if (parsed.data.locationName !== undefined) data.locationName = parsed.data.locationName;
   if (parsed.data.note !== undefined) data.note = parsed.data.note;
+  // 自动补坐标：更新地点时若没带坐标，则按最新地点名查 geocode 补一个
   if (parsed.data.lat !== undefined) data.lat = parsed.data.lat;
   if (parsed.data.lng !== undefined) data.lng = parsed.data.lng;
+  if ((data.lat == null || data.lng == null) && (data.locationName as string | undefined)?.trim()) {
+    try {
+      const r = await geocodeQuery((data.locationName as string).trim());
+      if (r.length > 0) {
+        data.lat = r[0].lat;
+        data.lng = r[0].lng;
+      }
+    } catch {
+      // 补坐标失败不阻塞更新
+    }
+  }
   if (parsed.data.weather !== undefined) {
     if (parsed.data.weather === null || parsed.data.weather.trim() === '') {
       data.weather = null;

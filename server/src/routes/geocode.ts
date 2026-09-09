@@ -1,13 +1,51 @@
 import { Router } from 'express';
 
-const router = Router();
-
-interface GeoResult {
+export interface GeoResult {
   name: string;
   address: string;
   lat: number;
   lng: number;
 }
+
+/**
+ * 地理编码查询（供路由与事件落库补坐标共用）
+ * 多源失败自动切换：Photon → Nominatim；全部失败返回空列表
+ */
+export async function geocodeQuery(q: string): Promise<GeoResult[]> {
+  const sources: { url: string; parser: (d: any, n: string) => GeoResult[] }[] = [
+    {
+      url: `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`,
+      parser: parsePhoton,
+    },
+    {
+      url: `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=5&accept-language=zh`,
+      parser: parseNominatim,
+    },
+  ];
+  for (const src of sources) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const r = await fetch(src.url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'WoZaiApp/1.7 (ywjsn552566@163.com)',
+          'Accept-Language': 'zh-CN,zh;q=0.9',
+        },
+      });
+      clearTimeout(timer);
+      if (!r.ok) continue;
+      const data = await r.json();
+      const results = src.parser(data, q);
+      if (results.length > 0) return results;
+    } catch {
+      // 下一个源
+    }
+  }
+  return [];
+}
+
+const router = Router();
 
 function parsePhoton(data: any, fallbackName: string): GeoResult[] {
   const out: GeoResult[] = [];
@@ -61,39 +99,8 @@ function parseNominatim(data: any, fallbackName: string): GeoResult[] {
 router.get('/', async (req, res) => {
   const q = String(req.query.q ?? '').trim();
   if (!q) return res.json({ results: [] });
-
-  const sources: { url: string; parser: (d: any, n: string) => GeoResult[] }[] = [
-    {
-      url: `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8`,
-      parser: parsePhoton,
-    },
-    {
-      url: `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=5&accept-language=zh`,
-      parser: parseNominatim,
-    },
-  ];
-
-  for (const src of sources) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const r = await fetch(src.url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'WoZaiApp/1.7 (ywjsn552566@163.com)',
-          'Accept-Language': 'zh-CN,zh;q=0.9',
-        },
-      });
-      clearTimeout(timer);
-      if (!r.ok) continue;
-      const data = await r.json();
-      const results = src.parser(data, q);
-      if (results.length > 0) return res.json({ results });
-    } catch {
-      // 下一个源
-    }
-  }
-  return res.json({ results: [] });
+  const results = await geocodeQuery(q);
+  return res.json({ results });
 });
 
 export default router;
