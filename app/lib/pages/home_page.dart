@@ -15,7 +15,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _tab = 0;
-  int _placesTick = 0; // 切到地点线时 +1，强制 PlacesPage 重建刷新新记录
+  final GlobalKey<PlacesPageState> _placesKey = GlobalKey<PlacesPageState>();
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +26,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           HomeTabPage(onViewAll: () => setState(() => _tab = 1)),
           const TimelinePage(),
-          PlacesPage(key: ValueKey('places-$_placesTick')),
+          PlacesPage(key: _placesKey),
           const SettingsPage(),
         ],
       ),
@@ -46,7 +46,8 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) {
-          if (i == 2) _placesTick++;
+          // 切到地点线时轻量刷新（保留地图位置与缩放，不重建页面）
+          if (i == 2 && _tab != 2) _placesKey.currentState?.refresh();
           setState(() => _tab = i);
         },
         destinations: const [

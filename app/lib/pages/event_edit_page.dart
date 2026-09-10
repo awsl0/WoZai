@@ -4,7 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
+import '../utils/photo_url.dart';
 import '../utils/weather.dart';
+import '../widgets/net_img.dart';
 
 /// 编辑记录页：修改时间/地点/备注，增删照片（保存后同步天气）
 class EventEditPage extends StatefulWidget {
@@ -177,17 +179,12 @@ class _EventEditPageState extends State<EventEditPage> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.network(
-              '$baseUrl/uploads/${path.split('/').last}',
+            child: NetImg(
+              url: photoUrl(baseUrl, path, thumbWidth: 200),
               width: 100,
               height: 100,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                width: 100,
-                height: 100,
-                color: Colors.grey.shade200,
-                child: const Icon(Icons.broken_image, color: Colors.grey),
-              ),
+              memCacheWidth: 200,
+              borderRadius: BorderRadius.circular(10),
             ),
           ),
           Positioned(

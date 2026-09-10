@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// 全屏照片查看器：黑底 + 左右滑动 + 双指缩放 + 显示张数
@@ -111,21 +112,21 @@ class _PhotoViewerImageState extends State<PhotoViewerImage> {
                 _tick++;
               })
           : null,
-      child: Image.network(
-        widget.url,
+      child: CachedNetworkImage(
+        imageUrl: widget.url,
         fit: BoxFit.contain,
         key: ValueKey('img-$_tick'),
-        loadingBuilder: (_, child, progress) => progress == null
-            ? child
-            : const Center(
-                child: CircularProgressIndicator(color: Colors.white70)),
-        errorBuilder: (_, _, _) => Center(
+        memCacheWidth: 1600, // 限制解码尺寸（大图降采样，减少内存）
+        fadeInDuration: const Duration(milliseconds: 120),
+        placeholder: (_, _) =>
+            const Center(child: CircularProgressIndicator(color: Colors.white70)),
+        errorWidget: (_, _, _) => const Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.broken_image, color: Colors.white54, size: 48),
-              const SizedBox(height: 8),
-              const Text('图片加载失败，点击重试',
+              Icon(Icons.broken_image, color: Colors.white54, size: 48),
+              SizedBox(height: 8),
+              Text('图片加载失败，点击重试',
                   style: TextStyle(color: Colors.white54, fontSize: 13)),
             ],
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../state/session.dart';
 import '../utils/photo_url.dart';
+import '../widgets/net_img.dart';
 import 'photo_viewer_page.dart';
 
 /// 照片墙：展示所有记录里的照片（网格），点击放大查看
@@ -15,12 +16,22 @@ class PhotoGalleryPage extends StatefulWidget {
 }
 
 class _PhotoGalleryPageState extends State<PhotoGalleryPage> {
-  late final List<String> _urls = _buildUrls();
+  late final List<String> _fullUrls = _buildUrls();
+  late final List<String> _thumbUrls = _buildThumbUrls();
 
   List<String> _buildUrls() {
     final baseUrl = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
     return widget.photos
         .map((p) => photoUrl(baseUrl, (p['filePath'] as String? ?? '')))
+        .toList();
+  }
+
+  /// 网格用缩略图（480px，服务端按需生成）——大幅减少流量和解码内存
+  List<String> _buildThumbUrls() {
+    final baseUrl = Session.instance.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    return widget.photos
+        .map((p) =>
+            photoUrl(baseUrl, (p['filePath'] as String? ?? ''), thumbWidth: 480))
         .toList();
   }
 
@@ -42,49 +53,25 @@ class _PhotoGalleryPageState extends State<PhotoGalleryPage> {
               itemCount: photos.length,
               itemBuilder: (context, i) {
                 final p = photos[i];
-                final url = _urls[i];
+                final thumbUrl = _thumbUrls[i];
                 return GestureDetector(
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => PhotoViewerPage(urls: _urls, initialIndex: i),
+                        builder: (_) =>
+                            PhotoViewerPage(urls: _fullUrls, initialIndex: i),
                       ),
                     );
                   },
                   child: Hero(
-                    tag: 'photo-$url',
+                    tag: 'photo-${_fullUrls[i]}',
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.network(
-                          url,
+                        NetImg(
+                          url: thumbUrl,
                           fit: BoxFit.cover,
-                          loadingBuilder: (_, child, progress) =>
-                              progress == null
-                                  ? child
-                                  : Container(
-                                      color: Colors.grey.shade200,
-                                      child: const Center(
-                                          child: SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                  strokeWidth: 2))),
-                                    ),
-                          errorBuilder: (_, _, _) => Container(
-                            color: Colors.grey.shade200,
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.broken_image,
-                                    color: Colors.grey, size: 28),
-                                SizedBox(height: 2),
-                                Text('加载失败',
-                                    style: TextStyle(
-                                        color: Colors.grey, fontSize: 10)),
-                              ],
-                            ),
-                          ),
+                          memCacheWidth: 480,
                         ),
                         // 左下角：所属事件的日期/地点
                         Align(

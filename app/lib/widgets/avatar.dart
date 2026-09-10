@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../state/session.dart';
+import '../utils/photo_url.dart';
+import 'net_img.dart';
 
 /// 通用头像：有 avatarPath 显示图片，否则显示昵称首字。
 /// 可带相机角标（点击换头像）。
@@ -31,16 +33,14 @@ class Avatar extends StatelessWidget {
 
     Widget content;
     if (path != null && path.isNotEmpty) {
-      content = ClipRRect(
+      content = NetImg(
+        url: photoUrl(baseUrl, path, thumbWidth: (radius * 3).round()),
+        width: radius * 2,
+        height: radius * 2,
+        memCacheWidth: (radius * 6).round(),
         borderRadius: BorderRadius.circular(10),
-        child: Image.network(
-          '$baseUrl/uploads/${path.split('/').last}',
-          width: radius * 2,
-          height: radius * 2,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) =>
-              _InitialAvatar(name: name, radius: radius, light: light),
-        ),
+        errorFallback:
+            _InitialAvatar(name: name, radius: radius, light: light),
       );
     } else {
       content = _InitialAvatar(name: name, radius: radius, light: light);

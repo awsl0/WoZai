@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../state/session.dart';
 import '../utils/photo_url.dart';
+import 'net_img.dart';
 
 /// 时间线事件卡片：照片墙 + 正文 + 时间/地点 + 作者
 class EventCard extends StatelessWidget {
@@ -40,19 +41,12 @@ class EventCard extends StatelessWidget {
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, i) {
                       final path = photos[i]['filePath'] as String? ?? '';
-                      return ClipRRect(
+                      return NetImg(
+                        url: photoUrl(baseUrl, path, thumbWidth: 320),
+                        width: 160,
+                        height: 160,
+                        memCacheWidth: 320,
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          photoUrl(baseUrl, path),
-                          width: 160,
-                          height: 160,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            width: 160,
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.broken_image, color: Colors.grey),
-                          ),
-                        ),
                       );
                     },
                   ),

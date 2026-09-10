@@ -3,7 +3,9 @@ import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../state/session.dart';
 import '../utils/calendar.dart';
+import '../utils/photo_url.dart';
 import '../utils/weather.dart';
+import '../widgets/net_img.dart';
 import 'event_page.dart';
 
 /// 时间线：左侧时间轴串联 + 季度渐变色 + 年度生肖图表 + 节日/纪念日提示 + 阴/阳历切换
@@ -195,20 +197,22 @@ class _TimelinePageState extends State<TimelinePage> {
                     )
                   : RefreshIndicator(
                       onRefresh: _refresh,
-                      child: ListView(
+                      // 用 builder 懒加载年份分组（记录很多时也只构建可见部分，滚动不卡）
+                      child: ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.only(bottom: 88),
-                        children: [
-                          for (final yearEntry in grouped)
-                            _YearSection(
-                              year: yearEntry.key,
-                              months: yearEntry.value,
-                              theme: theme,
-                              dateText: _dateText,
-                              titleOf: _titleOf,
-                              onTapEvent: _openEvent,
-                            ),
-                        ],
+                        itemCount: grouped.length,
+                        itemBuilder: (context, i) {
+                          final yearEntry = grouped[i];
+                          return _YearSection(
+                            year: yearEntry.key,
+                            months: yearEntry.value,
+                            theme: theme,
+                            dateText: _dateText,
+                            titleOf: _titleOf,
+                            onTapEvent: _openEvent,
+                          );
+                        },
                       ),
                     ),
     );
@@ -518,22 +522,15 @@ class _EntryRow extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // 缩略图
+                  // 缩略图（服务端按需缩略 + 磁盘缓存 + 解码降采样）
                   if (thumbnailPath != null) ...[
-                    ClipRRect(
+                    NetImg(
+                      url: photoUrl(baseUrl, thumbnailPath, thumbWidth: 96),
+                      width: 40,
+                      height: 40,
+                      memCacheWidth: 96,
                       borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        '$baseUrl/uploads/${thumbnailPath.split('/').last}',
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          width: 40,
-                          height: 40,
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: const Icon(Icons.image_outlined, size: 18, color: Colors.grey),
-                        ),
-                      ),
+                      brokenIconSize: 18,
                     ),
                     const SizedBox(width: 10),
                   ],

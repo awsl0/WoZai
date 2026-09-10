@@ -6,6 +6,7 @@ import '../constants/ai_styles.dart';
 import 'event_edit_page.dart';
 import 'photo_viewer_page.dart';
 import '../utils/photo_url.dart';
+import '../widgets/net_img.dart';
 
 /// 事件详情页：照片 + 时间/地点 + 备注 + AI 生成/重新生成 + 编辑正文 + 删除
 class EventPage extends StatefulWidget {
@@ -200,18 +201,12 @@ class _EventPageState extends State<EventPage> {
                       },
                       child: Hero(
                         tag: 'photo-${photoUrls[i]}',
-                        child: ClipRRect(
+                        child: NetImg(
+                          url: photoUrl(baseUrl,
+                              (photos[i]['filePath'] as String?) ?? '',
+                              thumbWidth: 480),
+                          memCacheWidth: 480,
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            photoUrls[i],
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
-                              width: 220,
-                              color: Colors.grey.shade200,
-                              child: const Icon(Icons.broken_image,
-                                  color: Colors.grey),
-                            ),
-                          ),
                         ),
                       ),
                     );

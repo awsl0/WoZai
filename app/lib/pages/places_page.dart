@@ -12,7 +12,7 @@ class PlacesPage extends StatefulWidget {
   const PlacesPage({super.key});
 
   @override
-  State<PlacesPage> createState() => _PlacesPageState();
+  State<PlacesPage> createState() => PlacesPageState();
 }
 
 /// 城市聚合点
@@ -52,7 +52,7 @@ class _ProvAgg {
   int get cityCount => cities.length;
 }
 
-class _PlacesPageState extends State<PlacesPage> {
+class PlacesPageState extends State<PlacesPage> {
   List<Map<String, dynamic>> _events = [];
   List<_CityAgg> _aggs = [];
   List<_SpotAgg> _spotAggs = [];
@@ -71,8 +71,11 @@ class _PlacesPageState extends State<PlacesPage> {
   @override
   void initState() {
     super.initState();
-    _refresh();
+    refresh();
   }
+
+  /// 公开刷新（供外部在新增记录后调用，不重建页面、保留地图位置）
+  Future<void> refresh() => _refresh();
 
   Future<void> _refresh() async {
     setState(() {
