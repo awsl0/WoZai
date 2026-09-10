@@ -132,8 +132,14 @@ class _PlacesPageState extends State<PlacesPage> {
       final lng = (e['lng'] as num?)?.toDouble();
       if (place.isEmpty && lat == null) continue;
 
-      // 归属省/市：城市库精确匹配 → 行政区名保留原名（如许昌市） → 普通地名就近城市
-      final info = eventCityInfo(place, lat, lng);
+      // 归属省/市：优先用事件自带真实省/市（后端地理编码）→ 城市库 → 行政区名保留 → 就近城市
+      final info = eventCityInfo(
+        place,
+        lat,
+        lng,
+        province: e['province'] as String?,
+        cityName: e['cityName'] as String?,
+      );
       if (info == null) continue;
       final String prov = info.$1;
       final String city = info.$2;

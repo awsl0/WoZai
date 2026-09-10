@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { generateDiary } from '../lib/ai.js';
-import { geocodeQuery } from './geocode.js';
+import { geocodeQuery, looksLikeAdmin } from './geocode.js';
 
 const router = Router();
 
@@ -66,18 +66,35 @@ router.post('/', upload.array('photos', 9), async (req, res) => {
       // 天气格式错误则忽略
     }
   }
-  // 自动补坐标：手动输入地点无坐标时，后端查 geocode 补一个（地点线/统计才能点亮）
+  // 自动补坐标：手动输入地点无坐标时，后端查 geocode 补坐标 + 真实省/市级属（行政区划）
   let lat: number | null = body.lat ? Number(body.lat) : null;
   let lng: number | null = body.lng ? Number(body.lng) : null;
-  if ((lat == null || lng == null) && body.locationName?.trim()) {
+  let province: string | null = null;
+  let cityName: string | null = null;
+  const place = body.locationName?.trim() ?? '';
+  if ((lat == null || lng == null) && place) {
     try {
-      const r = await geocodeQuery(body.locationName.trim());
+      const r = await geocodeQuery(place);
       if (r.length > 0) {
         lat = r[0].lat;
         lng = r[0].lng;
+        province = r[0].province ?? null;
+        // 用户输入本身是行政区名（市/县/区/州结尾）时保留原名，否则用编码结果的市/县名
+        cityName = looksLikeAdmin(place) ? place : r[0].cityName ?? null;
       }
     } catch {
       // 补坐标失败不阻塞创建
+    }
+  } else if (place) {
+    // 已有坐标（地图选点/自动定位）：若地点名是行政区，仍补省信息供地点线精确归属
+    try {
+      const r = await geocodeQuery(place);
+      if (r.length > 0) {
+        province = r[0].province ?? null;
+        cityName = looksLikeAdmin(place) ? place : r[0].cityName ?? null;
+      }
+    } catch {
+      // 忽略
     }
   }
   const event = await prisma.event.create({
@@ -88,6 +105,8 @@ router.post('/', upload.array('photos', 9), async (req, res) => {
       lat,
       lng,
       locationName: body.locationName || null,
+      province,
+      cityName,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       weather: weather as any,
       note: body.note || null,
@@ -159,15 +178,21 @@ router.put('/:id', async (req, res) => {
   }
   if (parsed.data.locationName !== undefined) data.locationName = parsed.data.locationName;
   if (parsed.data.note !== undefined) data.note = parsed.data.note;
-  // 自动补坐标：更新地点时若没带坐标，则按最新地点名查 geocode 补一个
+  // 自动补坐标：更新地点时若没带坐标，则按最新地点名查 geocode 补坐标 + 省/市级属
   if (parsed.data.lat !== undefined) data.lat = parsed.data.lat;
   if (parsed.data.lng !== undefined) data.lng = parsed.data.lng;
-  if ((data.lat == null || data.lng == null) && (data.locationName as string | undefined)?.trim()) {
+  const newPlace = (data.locationName as string | undefined)?.trim() ?? '';
+  if (newPlace) {
     try {
-      const r = await geocodeQuery((data.locationName as string).trim());
+      const r = await geocodeQuery(newPlace);
       if (r.length > 0) {
-        data.lat = r[0].lat;
-        data.lng = r[0].lng;
+        if (data.lat == null || data.lng == null) {
+          data.lat = r[0].lat;
+          data.lng = r[0].lng;
+        }
+        (data as Record<string, unknown>).province = r[0].province ?? null;
+        (data as Record<string, unknown>).cityName =
+          looksLikeAdmin(newPlace) ? newPlace : r[0].cityName ?? null;
       }
     } catch {
       // 补坐标失败不阻塞更新

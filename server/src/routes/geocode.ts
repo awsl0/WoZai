@@ -1,10 +1,20 @@
 import { Router } from 'express';
 
+/** 是否行政区名（市/区/县/州 结尾），如“许昌市”“太康县”“蜀山区” */
+export function looksLikeAdmin(s: string): boolean {
+  const t = s.trim();
+  return t.length <= 8 && /(市|区|县|州)$/.test(t);
+}
+
 export interface GeoResult {
   name: string;
   address: string;
   lat: number;
   lng: number;
+  /** 行政区划省（如“河南省”） */
+  province?: string;
+  /** 行政区划市/县/区名 */
+  cityName?: string;
 }
 
 /**
@@ -69,6 +79,8 @@ function parsePhoton(data: any, fallbackName: string): GeoResult[] {
       address: parts.join(' '),
       lat: Number(coord[1]),
       lng: Number(coord[0]),
+      province: String(props.state ?? '').trim() || undefined,
+      cityName: String(props.city ?? props.county ?? props.district ?? '').trim() || undefined,
     });
   }
   return out;
@@ -86,7 +98,16 @@ function parseNominatim(data: any, fallbackName: string): GeoResult[] {
     // display_name: 街道, 区, 市, 省, 国家
     const addrParts = segs.slice(0, Math.max(0, segs.length - 1)).slice(0, 4);
     const address = addrParts.slice().reverse().join(' ');
-    out.push({ name: nm, address: address.trim(), lat, lng });
+    out.push({
+      name: nm,
+      address: address.trim(),
+      lat,
+      lng,
+      province: String(r?.address?.state ?? '').trim() || undefined,
+      cityName:
+        String(r?.address?.city ?? r?.address?.county ?? r?.address?.district ?? '').trim() ||
+        undefined,
+    });
   }
   return out;
 }

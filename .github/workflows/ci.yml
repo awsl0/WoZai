@@ -76,7 +76,7 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
       - name: 更新仓库内 APK 安装包（WoZai-vX.Y.apk）
         run: |
-          version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d. -f1-2)
+          version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
           apk_name="WoZai-v${version}.apk"
           cp build/app/outputs/flutter-apk/app-release.apk ../"$apk_name"
           cd ..

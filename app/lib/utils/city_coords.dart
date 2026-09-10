@@ -259,13 +259,26 @@ bool looksLikeAdmin(String s) {
 }
 
 /// 事件 → 城市键（"省|城市名"），与地点线聚合口径一致。
-/// 规则：
+/// 规则（优先级从高到低）：
+///  0) 事件已带真实省/市（后端地理编码结果）→ 直接用（跨省界也不会误归属）
 ///  1) 地点名能匹配内置城市库 → 用库内归属（省/市精确）
-///  2) 有坐标且地点名本身是行政区（如“许昌市”，库中没有）→ 城市名用原名，省取就近内置城市的省，标记坐标用事件真实坐标
+///  2) 有坐标且地点名本身是行政区（如“许昌市”，库中没有）→ 城市名用原名，省取就近内置城市的省
 ///  3) 有坐标且地点名不是行政区（如“老李烧烤”）→ 归就近内置城市
 ///  4) 无坐标且匹配不上 → null
 (String, String, double, double)? eventCityInfo(
-    String place, double? lat, double? lng) {
+    String place, double? lat, double? lng,
+    {String? province, String? cityName}) {
+  final p = (province ?? '').trim();
+  final c = (cityName ?? '').trim();
+  // 0) 后端已解析的行政区（最可靠）
+  if (p.isNotEmpty) {
+    final cityResolved = c.isNotEmpty
+        ? c
+        : (looksLikeAdmin(place) ? place.trim() : null);
+    if (cityResolved != null) {
+      return (p, cityResolved, lat ?? 0, lng ?? 0);
+    }
+  }
   final m = matchCity(place); // 1) 库内精确
   if (m != null) return m;
   if (lat == null || lng == null) return null;

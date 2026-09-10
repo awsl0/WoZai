@@ -52,6 +52,8 @@ model Event {
   lat           Float?
   lng           Float?
   locationName  String?
+  province      String?  // 行政区划省（来自地理编码，如“河南省”）
+  cityName      String?  // 行政区划市/县名（来自地理编码或用户输入，如“许昌市”“太康县”）
   weather       Json?    // 当天天气：{ code, text, temp }（记录时按地点获取）
   note          String?
   content       String?

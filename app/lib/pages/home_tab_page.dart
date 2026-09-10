@@ -337,7 +337,13 @@ class _HomeTabPageState extends State<HomeTabPage> {
     final place = (e['locationName'] as String?)?.trim() ?? '';
     final lat = (e['lat'] as num?)?.toDouble();
     final lng = (e['lng'] as num?)?.toDouble();
-    final info = eventCityInfo(place, lat, lng);
+    final info = eventCityInfo(
+      place,
+      lat,
+      lng,
+      province: e['province'] as String?,
+      cityName: e['cityName'] as String?,
+    );
     if (info == null) return null;
     return '${info.$1}|${info.$2}';
   }
