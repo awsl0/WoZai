@@ -251,6 +251,33 @@ String nearestCity(double lat, double lng) {
   }
   return best;
 }
+
+/// 是否行政区名（市/区/县/州 结尾），如“许昌市”“太康县”“蜀山区”
+bool looksLikeAdmin(String s) {
+  final t = s.trim();
+  return t.length <= 8 && RegExp(r'(市|区|县|州)$').hasMatch(t);
+}
+
+/// 事件 → 城市键（"省|城市名"），与地点线聚合口径一致。
+/// 规则：
+///  1) 地点名能匹配内置城市库 → 用库内归属（省/市精确）
+///  2) 有坐标且地点名本身是行政区（如“许昌市”，库中没有）→ 城市名用原名，省取就近内置城市的省，标记坐标用事件真实坐标
+///  3) 有坐标且地点名不是行政区（如“老李烧烤”）→ 归就近内置城市
+///  4) 无坐标且匹配不上 → null
+(String, String, double, double)? eventCityInfo(
+    String place, double? lat, double? lng) {
+  final m = matchCity(place); // 1) 库内精确
+  if (m != null) return m;
+  if (lat == null || lng == null) return null;
+  final nc = nearestCityInfo(lat, lng);
+  if (nc == null) return null;
+  if (looksLikeAdmin(place)) {
+    // 2) 行政区名但不在库：城市名用原名，坐标用事件真实坐标（不并入临近城市）
+    return (nc.$1, place.trim(), lat, lng);
+  }
+  // 3) 普通地名归就近城市
+  return (nc.$1, nc.$2, nc.$3, nc.$4);
+}
 /// 细粒度地点表（著名景点/区县）：(地点名, 所属城市, 所属省, 纬度, 经度)
 /// 用于比城市更细一级的点亮（记录地点匹配到景点时显示到具体位置）
 const List<(String, String, String, double, double)> spotCoords = [

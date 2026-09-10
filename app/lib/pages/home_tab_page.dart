@@ -337,14 +337,9 @@ class _HomeTabPageState extends State<HomeTabPage> {
     final place = (e['locationName'] as String?)?.trim() ?? '';
     final lat = (e['lat'] as num?)?.toDouble();
     final lng = (e['lng'] as num?)?.toDouble();
-    if (lat != null && lng != null) {
-      final nc = nearestCityInfo(lat, lng);
-      if (nc != null) return '${nc.$1}|${nc.$2}';
-      return null;
-    }
-    final m = matchCity(place);
-    if (m != null) return '${m.$1}|${m.$2}';
-    return null;
+    final info = eventCityInfo(place, lat, lng);
+    if (info == null) return null;
+    return '${info.$1}|${info.$2}';
   }
 
   void _openEvent(Map<String, dynamic> event) async {

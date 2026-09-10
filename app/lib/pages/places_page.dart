@@ -132,24 +132,13 @@ class _PlacesPageState extends State<PlacesPage> {
       final lng = (e['lng'] as num?)?.toDouble();
       if (place.isEmpty && lat == null) continue;
 
-      // 归属省/市：有坐标优先（用最近内置城市判定归属）；否则靠地点名匹配城市库
-      String? prov, city;
-      double clat = 0, clng = 0;
-      if (lat != null && lng != null) {
-        final nc = nearestCityInfo(lat, lng);
-        if (nc == null) continue;
-        prov = nc.$1;
-        city = nc.$2;
-        clat = nc.$3;
-        clng = nc.$4;
-      } else {
-        final m = matchCity(place);
-        if (m == null) continue;
-        prov = m.$1;
-        city = m.$2;
-        clat = m.$3;
-        clng = m.$4;
-      }
+      // 归属省/市：城市库精确匹配 → 行政区名保留原名（如许昌市） → 普通地名就近城市
+      final info = eventCityInfo(place, lat, lng);
+      if (info == null) continue;
+      final String prov = info.$1;
+      final String city = info.$2;
+      final double clat = info.$3;
+      final double clng = info.$4;
 
       // 1) 内置景点（精确坐标，最高优先级）
       final spot = matchSpot(place);
@@ -168,7 +157,7 @@ class _PlacesPageState extends State<PlacesPage> {
       // 2) 有真实坐标的普通地点：按坐标精确点显示（地点线就能看到任意新地点）
       if (lat != null && lng != null && place.isNotEmpty) {
         final sa = spotMap.putIfAbsent('$place|$lat|$lng',
-            () => _SpotAgg(place, city!, prov!, lat, lng));
+            () => _SpotAgg(place, city, prov, lat, lng));
         sa.events.add(e);
         final ca = ensureCity(prov, city, clat, clng);
         if (!ca.spots.contains(sa)) ca.spots.add(sa);
